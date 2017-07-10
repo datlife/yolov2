@@ -25,10 +25,9 @@ Download: [YOLOv2 Keras Weights]()
 
 ## Train on custom data set
 
-### 1. Pre-process training data
-Input data: list of imageas in `.txt`  as format
-
-        
+**Pre-process training data**
+Input file: a `.txt` file  as following format
+      
         path/to/image1.jpg, x1, y1, x2, y2, class_name1
         path/to/image2.jpg, x1, y1, x2, y2, class_name3
         path/to/image3.jpg, x1, y1, x2, y2, class_name4
@@ -36,7 +35,7 @@ Input data: list of imageas in `.txt`  as format
         ...
         path/to/imagen.jpg, x1, y2, x2, y2, class_name6
         
-### 2. Train YOLOv2
+**Train YOLOv2 on custom data set**
 ```angular2html
 ./train.py --weight_path yolov2,weights --training_data training.txt
 ```
