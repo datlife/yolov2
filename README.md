@@ -35,9 +35,9 @@ Input file: a `.txt` file  as following format
         ...
         path/to/imagen.jpg, x1, y2, x2, y2, class_name6
         
-**Train YOLOv2 on custom data set**
+**Training**
 ```angular2html
-./train.py --weight_path yolov2,weights --training_data training.txt
+./train.py --weight_path yolov2,weights --training_data training.txt --epochs 1000
 ```
 
 ## Run YOLOv2 using a webcam as input
