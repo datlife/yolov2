@@ -30,8 +30,9 @@ def __main__():
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
             xc, yc, w, h = scale_rel_box(img_size, Box(xc, yc, w, h))
-            gt_boxes.append(Box(0, 0, float(w), float(h))) # since we calculate w h of anchors, we do not take xc yc into account
-    print("Number of ground truth boxes: {} boxes".format(len(gt_boxes)))    
+            # since we calculate w h of anchors, we do not take xc yc into account
+            gt_boxes.append(Box(0, 0, float(w), float(h)))
+    print("Number of ground truth boxes: {} boxes".format(len(gt_boxes)))
    
     # K-MEAN CLUSTERING
     anchors, avg_iou = k_mean_cluster(k, gt_boxes, loss_convergence=loss_conv)

@@ -26,8 +26,8 @@ class YOLOv2(object):
     def _construct_yolov2(self, feature_extractor, num_anchors, num_classes):
         """
         Build YOLOv2 Model
-        :return: 
         """
+
         features        = feature_extractor if (feature_extractor is not None) else darknet19(freeze_layers=True)
         object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=-17)
 
