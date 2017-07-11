@@ -2,7 +2,7 @@
 ---------
 This repo is the  implementation of YOLOv2, an object detector using Deep Learning, discussed in ["YOLO9000: Better, Faster, Stronger"](https://arxiv.org/abs/1612.08242)
 
-Project Status: **Under Development**
+Project Status: **Under Development!!**
 
 Download: [YOLOv2 Keras Weights]()
 
@@ -24,11 +24,10 @@ Download: [YOLOv2 Keras Weights]()
 ```
 
 ## Train on custom data set
-
-### 1. Pre-process training data
-Input data: list of imageas in `.txt`  as format
-
         
+**Pre-process training data**
+Input file: a `.txt` file  as following format
+      
         path/to/image1.jpg, x1, y1, x2, y2, class_name1
         path/to/image2.jpg, x1, y1, x2, y2, class_name3
         path/to/image3.jpg, x1, y1, x2, y2, class_name4
@@ -36,9 +35,9 @@ Input data: list of imageas in `.txt`  as format
         ...
         path/to/imagen.jpg, x1, y2, x2, y2, class_name6
         
-### 2. Train YOLOv2
+**Training**
 ```angular2html
-./train.py --weight_path yolov2,weights --training_data training.txt
+./train.py --weight_path yolov2,weights --training_data training.txt --epochs 1000
 ```
 
 ## Run YOLOv2 using a webcam as input
