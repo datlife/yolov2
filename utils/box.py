@@ -5,6 +5,12 @@ class Box(object):
         self.w = w
         self.h = h
 
+    def __str__(self):
+        return "{} {} {} {}".format(self.x, self.y, self.w, self.h)
+
+    def __repr__(self):
+        return str(self)
+
 
 def box_iou(b1, b2):
     intersect = box_intersection(b1, b2)
