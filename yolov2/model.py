@@ -39,6 +39,7 @@ class YOLOv2(object):
 def darknet19(pretrained_weights=None, freeze_layers=True):
     """
      DarkNet-19 model
+     :param img_size          : image size
      :param pretrained_weights: a path to pretrained weights
      :param freeze_layers:      boolean - Freeze layers during training
      

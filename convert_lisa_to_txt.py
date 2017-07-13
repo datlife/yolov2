@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import glob
-
+import numpy as np
 
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     image_paths, labels = load_lisa_data(csv_path)

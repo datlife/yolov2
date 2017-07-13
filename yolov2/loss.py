@@ -4,7 +4,7 @@ YOLOV2 Loss Function
 import keras.backend as K
 import numpy as np
 import tensorflow as tf
-
+from cfg import *
 
 def yolov2_loss(anchors, num_classes):
     """
@@ -195,9 +195,6 @@ def yolo_loss(anchors, n_classes):
     def custom_loss(y_true, y_pred):
         #         CONV_SHAPE = tf.cast(K.shape(y_pred)[1:3], dtype=tf.int32)
 
-        GRID_W, GRID_H = 40, 30
-        #         GRID_W, GRID_H = CONV_SHAPE[0], CONV_SHAPE[1]  # a tiny hack to get width, height of output layer
-        NORM_W, NORM_H = GRID_W * 32, GRID_H * 32  # Scale back to get image input size
 
         SCALE_NOOB, SCALE_CONF, SCALE_COOR, SCALE_PROB = 0.5, 5.0, 5.0, 1.0
 
@@ -217,15 +214,13 @@ def yolo_loss(anchors, n_classes):
 
         # Adjust ground truth
         # adjust x and y
-        gt_dim = K.shape(y_true)
-        y_true = K.reshape(y_true, [gt_dim[0], GRID_W, GRID_H, gt_dim[1], gt_dim[2]])
         center_xy = .5 * (y_true[:, :, :, :, 0:2] + y_true[:, :, :, :, 2:4])
-        center_xy = center_xy / np.reshape([(float(NORM_W) / GRID_W), (float(NORM_H) / GRID_H)], [1, 1, 1, 1, 2])
+        center_xy = center_xy / np.reshape([(float(IMG_WIDTH) / GRID_W), (float(IMG_HEIGHT) / GRID_H)], [1, 1, 1, 1, 2])
         true_box_xy = center_xy - tf.floor(center_xy)
 
         # adjust w and h
         true_box_wh = (y_true[:, :, :, :, 2:4] - y_true[:, :, :, :, 0:2])
-        true_box_wh = tf.sqrt(true_box_wh / np.reshape([float(NORM_W), float(NORM_H)], [1, 1, 1, 1, 2]))
+        true_box_wh = tf.sqrt(true_box_wh / np.reshape([float(IMG_WIDTH), float(IMG_HEIGHT)], [1, 1, 1, 1, 2]))
 
         # adjust confidence
         pred_tem_wh = tf.pow(pred_box_wh, 2) * np.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2])
