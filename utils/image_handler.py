@@ -91,8 +91,10 @@ def rotate(img, bbox=None):
     return rotated_img, rotated_box
 
 
-def pre_process(img):
-    img = img/255.
+def preprocess_img(img):
+    img = img/255
+    img -= 0.5
+    img *= 2
     return img
 
 

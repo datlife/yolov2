@@ -1,43 +1,10 @@
-"""
-
-"""
+import pandas as pd
 import os
 import glob
-import pandas as pd
-import numpy as np
-
-
-def preprocess_input(txt_file):
-    """
-    Parse input file into X, Y
-    
-    Parameters
-    ----------
-    input file : text file
-            image_path, x1, x2, y1, y2, label1
-            image_path, x1, x2, y1, y2, label2
-
-    :return: 
-            X:  list of image_path
-            Y:  list of labels as [x1, x2, y1, y2, label]
-    """
-    # Extract bounding boxes from training data
-    image_paths = []
-    gt_boxes    = []
-    with open(txt_file, "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
-            xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
-            xc, yc, w, h = scale_rel_box(img_size, Box(xc, yc, w, h))
-
-            image_paths.append(img_path)
-            gt_boxes.append(Box(xc, yc, float(w), float(h)))
-    print("Number of ground truth boxes: {} boxes".format(len(gt_boxes)))
 
 
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
-    image_paths, labels = sload_lisa_data(csv_path)
+    image_paths, labels = load_lisa_data(csv_path)
     df = pd.concat([image_paths, labels], axis=1)
     np.savetxt("training.txt", df.values, delimiter=',', fmt='%s')
     return image_paths, labels

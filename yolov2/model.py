@@ -45,7 +45,7 @@ def darknet19(pretrained_weights=None, freeze_layers=True):
      :return: 
         DarkNet19 model
      """
-    image = Input(shape=(1280, 960, 3))
+    image = Input(shape=(None, None, 3))
 
     x = conv_block(image, 32, (3, 3), padding='same')  # << --- Input layer
     x = MaxPool2D(strides=2)(x)

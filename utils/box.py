@@ -1,9 +1,55 @@
+import numpy as np
+
+
 class Box(object):
     def __init__(self, xc, yc, w, h):
         self.x = xc
         self.y = yc
         self.w = w
         self.h = h
+
+    def to_opencv_format(self):
+        """
+        
+        :return: 
+        """
+        x1 = int(self.x - self.w/2)
+        y1 = int(self.y - self.h/2)
+        x2 = int(self.x + self.w/2)
+        y2 = int(self.y + self.h/2)
+        opencv_box = [[(x1, y1), (x2, y2)]]
+
+        return opencv_box
+
+    def to_relative_size(self, img_size=(1280, 960)):
+        """
+        
+        :param img_size: 
+        :return: 
+        """
+        width, height = img_size
+        xc = self.x/(1.* width)
+        yc = self.y/(1.* height)
+        w  = self.w/(1.* width)
+        h  = self.h/(1.* height)
+        return xc, yc, w, h
+
+    def to_abs_size(self, img_size=(1280, 960)):
+        """
+
+        :param img_size: 
+        :return: 
+        """
+        width, height = img_size
+
+        if self.x > 1.0:  # Make sure current box is in relative format
+            return self.x, self.y, self.w, self.h
+
+        xc = self.x   * width
+        yc = self.y   * height
+        w  = self.w   * width
+        h  = self.h   * height
+        return xc, yc, w, h
 
     def __str__(self):
         return "{} {} {} {}".format(self.x, self.y, self.w, self.h)
@@ -41,6 +87,54 @@ def box_union(b1, b2):
     intersect = box_intersection(b1, b2)
     union = (b1.w * b1.h) + (b2.w * b2.h) - intersect
     return union
+
+
+def convert_bbox(x1, y1, x2, y2):
+    w = float(x2) - float(x1)
+    h = float(y2) - float(y1)
+    xc = float(x1) + w / 2.
+    yc = float(y1) + h / 2.
+    return xc, yc, w, h
+
+
+def scale_rel_box(img_size, box):
+    """
+    Scale bounding box relative to image size
+    """
+    width, height, _ = img_size
+    dw = 1. / width
+    dh = 1. / height
+    xc = box.x * dw
+    yc = box.y * dh
+    w  = box.w * dw
+    h  = box.h * dh
+    return xc, yc, w, h
+
+
+def build_box_from_pd(bbox):
+    """
+    Image Coordinate
+    0
+    *------------------------------> x
+    |  Upper               |
+    |     *........        |
+    |     :   *   :        |
+    |     :.......*        |
+    |            Lower     |
+    |----------------------*
+    |
+    y
+    :param bbox: a single panda data frames
+    :return: 
+    """
+    x = bbox.loc['Upper left corner X']
+    y = bbox.loc['Upper left corner Y']
+    w = bbox.loc['Lower right corner X'] - bbox.loc['Upper left corner X']
+    h = bbox.loc['Lower right corner Y'] - bbox.loc['Upper left corner Y']
+    xc = x + w/2
+    yc = y + h/2
+
+    return Box(xc, yc, w, h)
 
 # # TEST CASE ##
 if __name__ == "__main__":

@@ -1,3 +1,20 @@
+"""
+This script will generate anchors based on your training bounding boxes.
+
+It will apply k-mean cluster through the boxes in training data to determine size (w, h) for K anchors (in YOLOv2, K = 5)
+
+Requirements
+------------
+   1. One needs to have a training data in txt format as [img_path, x1, x2, y1, y2, label]
+   2. Image size of training data. [default : w= 1280 h =960]
+
+
+Example:
+--------
+
+python generate_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
+
+"""
 import numpy as np
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
@@ -13,7 +30,6 @@ parser.add_argument('--img_height',  help='Image height', type=int, default=960)
 
 def __main__():
     args = parser.parse_args()
-    # Extract Arguments
     k            = args.num_anchors
     label_path   = args.label_path
     loss_conv    = args.loss
@@ -21,7 +37,7 @@ def __main__():
     img_height   = args.img_height
     img_size     = (img_width, img_height, 3)
     gt_boxes     = []
-    feature_size = 1/32   # since DarkNet performs max-pool 5 times -> feature map size shrinks 2^5 =32 times
+    feature_size = 1/32         # since DarkNet performs max-pool 5 times -> feature map size shrinks 2^5 =32 times
 
     # Extract bounding boxes from training data
     with open(label_path, "r") as f:
@@ -34,7 +50,7 @@ def __main__():
             gt_boxes.append(Box(0, 0, float(w), float(h)))
     print("Number of ground truth boxes: {} boxes".format(len(gt_boxes)))
    
-    # K-MEAN CLUSTERING
+    # ############## K-MEAN CLUSTERING ########################
     anchors, avg_iou = k_mean_cluster(k, gt_boxes, loss_convergence=loss_conv)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
@@ -80,7 +96,7 @@ def run_k_mean(n_anchors, boxes, centroids):
     :param centroids: 
     :return: 
         new_centroids: set of new anchors
-        groups:        wth?
+        avg_iou:       avg_iou
         loss:          compared to current bboxes
     """
     loss = 0
@@ -106,7 +122,7 @@ def run_k_mean(n_anchors, boxes, centroids):
         new_centroids[group_index].h += box.h
 
     for i in range(n_anchors):
-        if (len(groups[i]) == 0):
+        if len(groups[i]) == 0:
             continue
         new_centroids[i].w /= len(groups[i])
         new_centroids[i].h /= len(groups[i])
