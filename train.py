@@ -15,19 +15,25 @@ pretrained_path  = "/home/ubuntu/dataset/darknet19_544.weights"
 x_train, y_train = load_data('training.txt')
 labels           = np.unique(y_train[:, 1])
 num_classes      = len(labels)            # Count number of classes in the data set
-train_data_gen = flow_from_list(x_train, y_train, ANCHORS, batch_size=BATCH_SIZE, augment_data=False)
+train_data_gen   = flow_from_list(x_train, y_train, ANCHORS, 
+                                  batch_size=BATCH_SIZE, 
+                                  augment_data=True)
 print("Train: {} samples\nNumber of classes: {}".format(len(x_train), num_classes))
 print("\n\nAnchors using K-mean clustering [K=5]\n {}".format(ANCHORS))
 
 
 # CONSTRUCT MODEL
-darknet19 = darknet19(pretrained_path, freeze_layers=True)
+darknet19 = darknet19(freeze_layers=True)
 yolov2    = YOLOv2(feature_extractor=darknet19, num_anchors=len(ANCHORS), num_classes=N_CLASSES)
 model     = yolov2.model
+
+# LOAD PRE-TRAINED MODEL
+model.load_weights('yolov2.weights')
 
 # TRAIN ON MULTI-GPUS
 n_gpus = get_gpus()
 if n_gpus > 1:
+    BATCH_SIZE = n_gpus * BATCH_SIZE
     model = make_parallel(model, n_gpus)
 
 model.compile(optimizer=Adam(LEARN_RATE), loss=custom_loss)
@@ -38,7 +44,7 @@ tf_board = keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write
 check_pt = keras.callbacks.ModelCheckpoint('models/weights.{epoch:02d}-{loss:.2f}.hdf5', verbose=0, save_best_only=False,
                                            save_weights_only=False, mode='auto', period=1)
 hist = model.fit_generator(generator=train_data_gen,
-                           steps_per_epoch=len(x_train) / BATCH_SIZE,
+                           steps_per_epoch=3*len(x_train) / BATCH_SIZE,
                            epochs=EPOCHS,
                            callbacks=[tf_board, check_pt],
                            workers=1, verbose=1)
