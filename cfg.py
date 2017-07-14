@@ -6,8 +6,13 @@ SHRINK_FACTOR = 32   # Darknet19 uses max-pool 5 times, 2^5 = 32
 GRID_W        = IMG_WIDTH/SHRINK_FACTOR
 GRID_H        = IMG_HEIGHT/SHRINK_FACTOR
 N_CLASSES     = 31
-ANCHORS       = np.array(((0.57273, 0.677385),
-                         (1.87446, 2.06253),
-                         (3.33843, 5.47434),
-                         (7.88282, 3.52778),
-                         (9.77052, 9.16828)))
+ANCHORS       = np.array(((2.3445192307692295, 2.586249999999999),
+                         (0.942162958115184, 1.0661812827225126),
+                         (3.5170454545454537, 3.860795454545453),
+                         (1.2841991833030852, 1.4164587114337575),
+                         (1.7278836116910237, 1.8796972860125247)))
+
+# HYPER-PARAMETERS
+BATCH_SIZE = 16
+EPOCHS     = 5
+LEARN_RATE = 1e-5

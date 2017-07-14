@@ -59,7 +59,7 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
                 one_hot = np.eye(len(categories))[index_label]
                 box = bbox.to_abs_size(img_size=(width, height))
                 X.append(processed_img)
-                Y.append(np.concatenate([np.array(box), [1.0], one_hot]))
+                Y.append(np.concatenate([np.array(box), [0.0], one_hot]))
 
                 if augment_data is True:
                     aug_level = augment_level.loc[augment_level['label'] == label, 'scaling_factor'].values[0]
@@ -78,15 +78,15 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
 
                         aug_box = aug_box.to_abs_size(img_size=(width, height))
                         X.append(processed_img)
-                        Y.append(np.asarray(np.concatenate([np.array(aug_box), [1.0], one_hot])))
+                        Y.append(np.asarray(np.concatenate([np.array(aug_box), [0.0], one_hot])))
 
             # Shuffle X, Y again
             X, Y = shuffle(X, Y)
             X = np.array(X)
             Y = np.array(Y)
             l_shape = np.shape(Y)
-            Y = np.tile(Y, (1, GRID_H*GRID_W*len(anchors))).reshape([l_shape[0], GRID_W, GRID_H, len(anchors), l_shape[1]])
-            # Generate (augmented data + original data) in correct batch_size
+            Y = np.tile(Y, (1, GRID_H*GRID_W*len(anchors))).reshape([l_shape[0], GRID_W*GRID_H, len(anchors), l_shape[1]])
+
             iterations = list(range(int(len(X) / batch_size)))
             for z in iterations:
                 yield X[z * batch_size:(z * batch_size) + batch_size], Y[z * batch_size:(z * batch_size) + batch_size]

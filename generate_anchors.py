@@ -46,10 +46,8 @@ def __main__():
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
             xc, yc, w, h = scale_rel_box(img_size, Box(xc, yc, w, h))
-            # since we calculate w h of anchors, we do not take xc yc into account
             gt_boxes.append(Box(0, 0, float(w), float(h)))
-    print("Number of ground truth boxes: {} boxes".format(len(gt_boxes)))
-   
+
     # ############## K-MEAN CLUSTERING ########################
     anchors, avg_iou = k_mean_cluster(k, gt_boxes, loss_convergence=loss_conv)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
@@ -91,52 +89,52 @@ def run_k_mean(n_anchors, boxes, centroids):
 
                     d(box, centroid) = 1−IOU(box, centroid)
 
-    :param num_anchors: K-value , number of desired anchors box
+    :param n_anchors: K-value , number of desired anchors box
     :param boxes:      list of bounding box in format [x1, y1, w, h]
     :param centroids: 
     :return: 
-        new_centroids: set of new anchors
+        anchors:      set of new anchors
         avg_iou:       avg_iou
         loss:          compared to current bboxes
     """
     loss = 0
     groups = []
-    new_centroids = []
+    anchors = []
     for i in range(n_anchors):
         groups.append([])
-        new_centroids.append(Box(0, 0, 0, 0))
+        anchors.append(Box(0, 0, 0, 0))
 
     for box in boxes:
         min_distance = 1
         group_index = 0
 
         for i, centroid in enumerate(centroids):
-            distance = (1 - box_iou(box, centroid))
+            distance = (1 - box_iou(box, centroid)) # <-- YOLO9000 paper uses this formula instead of Euclidean distance
             if distance < min_distance:
                 min_distance = distance
                 group_index = i
 
         groups[group_index].append(box)
         loss += min_distance
-        new_centroids[group_index].w += box.w
-        new_centroids[group_index].h += box.h
+        anchors[group_index].w += box.w
+        anchors[group_index].h += box.h
 
     for i in range(n_anchors):
         if len(groups[i]) == 0:
             continue
-        new_centroids[i].w /= len(groups[i])
-        new_centroids[i].h /= len(groups[i])
+        anchors[i].w /= len(groups[i])
+        anchors[i].h /= len(groups[i])
 
-    iou = 0
+    iou    = 0
     counter = 0
-    for i, anchor in enumerate(new_centroids):
+    for i, anchor in enumerate(anchors):
         for gt_box in groups[i]:
             iou += box_iou(gt_box, anchor)
             counter += 1
 
     avg_iou = iou / counter
     # print("Average IOU: {:4f}".format(avg_iou))
-    return new_centroids, avg_iou, loss
+    return anchors, avg_iou, loss
 
 
 def convert_bbox(x1, y1, x2, y2):

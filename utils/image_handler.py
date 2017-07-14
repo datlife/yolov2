@@ -92,9 +92,9 @@ def rotate(img, bbox=None):
 
 
 def preprocess_img(img):
-    img  = img / 255.
-    img  = img - 0.5
-    img  = img * 2
+    img = img/255
+    # img -= 0.5
+    # img *= 2
     return img
 
 

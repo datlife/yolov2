@@ -85,7 +85,7 @@ def darknet19(pretrained_weights=None, freeze_layers=True):
         print("Pre-trained weights have been loaded into model")
 
     if freeze_layers:
-        for layer in feature_extractor.layers:
+        for layer in feature_extractor.layers[:-4]:
             layer.trainable = False
 
     return feature_extractor
