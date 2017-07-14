@@ -20,21 +20,33 @@ def custom_loss(y_true, y_pred):
     y_true = K.reshape(y_true, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
 
     anchor_tensor = np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
+    # Create Grid map
+    # In YOLO the height index is the inner most iteration.
+    cx = K.arange(0, stop=pred_shape[0])
+    cx = K.tile(cx, [pred_shape[1]])
+    cy = K.arange(0, stop=pred_shape[1])
+    cy = K.tile(K.expand_dims(cy, 0), [pred_shape[0], 1])
+    cy = K.flatten(K.transpose(cy))
+
+    c_xy = K.transpose(K.stack([cx, cy]))
+    c_xy = K.reshape(c_xy, [1, pred_shape[1], pred_shape[0], 2])
+    c_xy = tf.transpose(c_xy, [0, 2, 1, 3])
+    c_xy = K.cast(c_xy, K.dtype(y_pred))
+    c_xy = K.expand_dims(c_xy, 3)
+    c_xy = K.tile(c_xy, [1, 1, 1, N_ANCHORS, 1])
 
     #  Adjust Prediction
-    pred_box_xy   = tf.sigmoid(y_pred[:, :, :, :, :2])
+    pred_box_xy   = tf.sigmoid(y_pred[:, :, :, :, :2])  + c_xy
     pred_box_wh   = tf.exp(y_pred[:, :, :, :, 2:4]) * anchor_tensor
     pred_box_wh   = tf.sqrt(pred_box_wh / np.reshape([float(GRID_W), float(GRID_H)], [1, 1, 1, 1, 2]))
     pred_box_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)  # adjust confidence
     pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])  # adjust probability
 
     #  Adjust ground truth
-    center_xy = y_true[:, :, :, :, 0:2]
-    center_xy = center_xy / np.reshape([(float(NORM_W) / GRID_W), (float(NORM_H) / GRID_H)], [1, 1, 1, 1, 2])
-
-    true_box_xy = center_xy - tf.floor(center_xy)
+    true_box_xy = y_true[:, :, :, :, 0:2] / np.reshape([(float(NORM_W) / GRID_W), (float(NORM_H) / GRID_H)], [1, 1, 1, 1, 2])
     true_box_wh = y_true[:, :, :, :, 2:4]
     true_box_wh = tf.sqrt(true_box_wh / np.reshape([float(NORM_W), float(NORM_H)], [1, 1, 1, 1, 2]))
+
 
     # adjust confidence
     pred_tem_wh = tf.pow(pred_box_wh, 2) * np.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2])
@@ -68,7 +80,7 @@ def custom_loss(y_true, y_pred):
     # Compute the weights
 
     # Object Confidence Loss
-    weight_conf = no_object_scale * (1. - true_box_conf) + object_scale * true_box_conf
+    weight_conf = no_object_scale*(1. - true_box_conf) + object_scale*true_box_conf
 
     # Object Localization Loss
     weight_coor = tf.concat(4 * [true_box_conf], 4)

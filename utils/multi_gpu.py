@@ -1,4 +1,5 @@
 from keras.layers import merge
+from keras.layers.merge import concatenate
 from keras.layers.core import Lambda
 from keras.models import Model
 import tensorflow as tf
@@ -13,7 +14,7 @@ def get_gpus():
     devices = device_lib.list_local_devices()
     gpus = [x for x in devices if x.device_type == 'GPU']
     num_gpus = len(gpus)
-    print("There is {} GPU(s) on device.".format(num_gpus))
+    print("There is(are) {} GPU(s) on device.".format(num_gpus))
     return num_gpus
 
 
@@ -51,6 +52,6 @@ def make_parallel(model, gpu_count):
     with tf.device('/cpu:0'):
         merged = []
         for outputs in outputs_all:
-            merged.append(merge(outputs, mode='concat', concat_axis=0))
+            merged.append(concatenate(outputs, axis=0))
             
-        return Model(input=model.inputs, output=merged)
+        return Model(inputs=model.inputs, outputs=merged)
