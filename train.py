@@ -23,12 +23,12 @@ print("\n\nAnchors using K-mean clustering [K=5]\n {}".format(ANCHORS))
 
 
 # CONSTRUCT MODEL
-darknet19 = darknet19(freeze_layers=True)
+darknet19 = darknet19(pretrained_path, freeze_layers=True)
 yolov2    = YOLOv2(feature_extractor=darknet19, num_anchors=len(ANCHORS), num_classes=N_CLASSES)
 model     = yolov2.model
 model.summary()
 # LOAD PRE-TRAINED MODEL
-model.load_weights('/home/ubuntu/dataset/yolov2.weights')
+# model.load_weights('/home/ubuntu/dataset/yolov2.weights')
 
 # TRAIN ON MULTI-GPUS
 n_gpus = get_gpus()
@@ -48,5 +48,5 @@ hist = model.fit_generator(generator=train_data_gen,
                            epochs=EPOCHS,
                            callbacks=[tf_board, check_pt],
                            workers=1, verbose=1,
-                           initial_epoch=10)
+                           initial_epoch=0)
 model.save_weights('yolov2.weights')
