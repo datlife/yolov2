@@ -28,25 +28,27 @@ yolov2    = YOLOv2(feature_extractor=darknet19, num_anchors=len(ANCHORS), num_cl
 model     = yolov2.model
 model.summary()
 # LOAD PRE-TRAINED MODEL
-# model.load_weights('/home/ubuntu/dataset/yolov2.weights')
+model.load_weights('yolov2.weights')
 
 # TRAIN ON MULTI-GPUS
 n_gpus = get_gpus()
 if n_gpus > 1:
     BATCH_SIZE = n_gpus * BATCH_SIZE
-    model = make_parallel(model, n_gpus)
+    model_par = make_parallel(model, n_gpus)
+else:
+    model_par = model
 
-model.compile(optimizer=Adam(LEARN_RATE), loss=custom_loss)
+model_par.compile(optimizer=Adam(LEARN_RATE), loss=custom_loss)
 
 
 # TRAINING
 tf_board = keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
-check_pt = keras.callbacks.ModelCheckpoint('models/weights.{epoch:02d}-{loss:.2f}.hdf5', verbose=0, save_best_only=False,
-                                           save_weights_only=True, mode='auto', period=1)
-hist = model.fit_generator(generator=train_data_gen,
-                           steps_per_epoch=3*len(x_train) / BATCH_SIZE,
-                           epochs=EPOCHS,
-                           callbacks=[tf_board, check_pt],
-                           workers=1, verbose=1,
-                           initial_epoch=0)
+# @TODO :model checkpoint save signle-instance mocel
+hist = model_par.fit_generator(generator=train_data_gen,
+                               steps_per_epoch=3*len(x_train) / BATCH_SIZE,
+                               epochs=40,
+                               callbacks=[tf_board],
+                               workers=1, verbose=1,
+                               initial_epoch=20)
+
 model.save_weights('yolov2.weights')
