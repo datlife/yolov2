@@ -25,6 +25,7 @@ Download: [YOLOv2 Keras Weights]()
 ## Train on custom data set
         
 **Step 1: Pre-process training data**
+
 Input file: a `.txt` file  as following format
       
         path/to/image1.jpg, x1, y1, x2, y2, class_name1
@@ -34,14 +35,15 @@ Input file: a `.txt` file  as following format
         ...
         path/to/imagen.jpg, x1, y2, x2, y2, class_name6
         
-**Step 2: Generate Anchors for your data to train faster*
+        
+**Step 2: Generate Anchors for your data to train faster**
 
 It will generate anchors.txt in the same directory
 ```
 python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
 ```
 
-**Step 3: Update parameters in cfg file*
+**Step 3: Update parameters in cfg file**
 
 ```
 N_CLASSES     = 31   # <---- Number of classes in your data set
@@ -56,7 +58,7 @@ ANCHORS       = np.array(((0.023717899133663362, 0.035715759075907606),  # <--- 
                           (0.04450034340659346, 0.064308608058608)))
 ```
 
-**Step 4: Fine-tune for your own dataset*
+**Step 4: Fine-tune for your own dataset**
 
 * Training on your own datset
 ```angular2html
