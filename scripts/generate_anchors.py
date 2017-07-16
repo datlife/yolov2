@@ -13,7 +13,8 @@ Example:
 --------
 
 python generate_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
-
+python generate_anchors.py -n 5 -p training.txt -w 1280 -h 960
+s
 """
 import numpy as np
 from utils.box import Box, box_iou
@@ -21,11 +22,11 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
 
-parser.add_argument('--num_anchors', help="Number of anchors",      type=int,  default=5)
-parser.add_argument('--label_path',  help="Text file [label, x1, y1, w, h]", default='training.txt')
-parser.add_argument('--loss',        help="Loss Convergence value", type=float,  default=1e-5)
-parser.add_argument('--img_width',   help='Image width',  type=int, default=1280)
-parser.add_argument('--img_height',  help='Image height', type=int, default=960)
+parser.add_argument('--num_anchors', '-n', type=int,   default=5, help="Number of anchors")
+parser.add_argument('--label_path',  '-p', type='str', default='../data/training.txt', help="Training txt file")
+parser.add_argument('--img_width',   '-w', type=int,   default=1280, help='Image width')
+parser.add_argument('--img_height',  '-h', type=int,   default=960, help='Image height')
+parser.add_argument('--loss',        '-l', type=float, default=1e-5,   help="Loss Convergence value")
 
 
 def __main__():
@@ -37,7 +38,6 @@ def __main__():
     img_height   = args.img_height
     img_size     = (img_width, img_height, 3)
     gt_boxes     = []
-    feature_size = 1/32         # since DarkNet performs max-pool 5 times -> feature map size shrinks 2^5 =32 times
 
     # Extract bounding boxes from training data
     with open(label_path, "r") as f:
@@ -53,25 +53,25 @@ def __main__():
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
     # print result
-    print("Anchors box result [relative to feature map]:\n")
+    print("Anchors box result [relative size]:\n")
     for anchor in anchors:
-        print("({}, {})".format(anchor.w * img_width*feature_size, anchor.h * img_height*feature_size))
+        print("({}, {})".format(anchor.w, anchor.h))
 
 
-def k_mean_cluster(k, gt_boxes, loss_convergence=1e-5):
+def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
     """
     Cluster anchors.
     """
     # initial random centroids
-    centroid_indices = np.random.choice(len(gt_boxes), k)
+    centroid_indices = np.random.choice(len(gt_boxes), n_anchors)
     centroids = []
     for centroid_index in centroid_indices:
         centroids.append(gt_boxes[centroid_index])
 
     # iterate k-means
-    anchors, avg_iou, loss = run_k_mean(k, gt_boxes, centroids)
+    anchors, avg_iou, loss = run_k_mean(n_anchors, gt_boxes, centroids)
     while True:
-        anchors, avg_iou, curr_loss = run_k_mean(k, gt_boxes, anchors)
+        anchors, avg_iou, curr_loss = run_k_mean(n_anchors, gt_boxes, anchors)
         if abs(loss - curr_loss) < loss_convergence:
             break
         loss = curr_loss
@@ -93,48 +93,48 @@ def run_k_mean(n_anchors, boxes, centroids):
     :param boxes:      list of bounding box in format [x1, y1, w, h]
     :param centroids: 
     :return: 
-        anchors:      set of new anchors
-        avg_iou:       avg_iou
+        new_centroids: set of new anchors
+        groups:        wth?
         loss:          compared to current bboxes
     """
     loss = 0
     groups = []
-    anchors = []
+    new_centroids = []
     for i in range(n_anchors):
         groups.append([])
-        anchors.append(Box(0, 0, 0, 0))
+        new_centroids.append(Box(0, 0, 0, 0))
 
     for box in boxes:
         min_distance = 1
         group_index = 0
 
         for i, centroid in enumerate(centroids):
-            distance = (1 - box_iou(box, centroid)) # <-- YOLO9000 paper uses this formula instead of Euclidean distance
+            distance = (1 - box_iou(box, centroid))
             if distance < min_distance:
                 min_distance = distance
                 group_index = i
 
         groups[group_index].append(box)
         loss += min_distance
-        anchors[group_index].w += box.w
-        anchors[group_index].h += box.h
+        new_centroids[group_index].w += box.w
+        new_centroids[group_index].h += box.h
 
     for i in range(n_anchors):
         if len(groups[i]) == 0:
             continue
-        anchors[i].w /= len(groups[i])
-        anchors[i].h /= len(groups[i])
+        new_centroids[i].w /= len(groups[i])
+        new_centroids[i].h /= len(groups[i])
 
-    iou    = 0
+    iou = 0
     counter = 0
-    for i, anchor in enumerate(anchors):
+    for i, anchor in enumerate(new_centroids):
         for gt_box in groups[i]:
             iou += box_iou(gt_box, anchor)
             counter += 1
 
     avg_iou = iou / counter
     # print("Average IOU: {:4f}".format(avg_iou))
-    return anchors, avg_iou, loss
+    return new_centroids, avg_iou, loss
 
 
 def convert_bbox(x1, y1, x2, y2):
@@ -157,6 +157,45 @@ def scale_rel_box(img_size, box):
     w  = box.w * dw
     h  = box.h * dh
     return xc, yc, w, h
+
+
+class Box(object):
+    def __init__(self, xc, yc, w, h):
+        self.x = xc
+        self.y = yc
+        self.w = w
+        self.h = h
+
+
+def box_iou(b1, b2):
+    intersect = box_intersection(b1, b2)
+    union = box_union(b1, b2)
+    iou = float(intersect / union)
+    return iou
+
+
+def box_intersection(b1, b2):
+    w = overlap(b1.x, b1.w, b2.x, b2.w)
+    h = overlap(b1.x, b1.h, b2.x, b2.h)
+    if (w < 0) or (h < 0): return 0
+    area = w * h
+    return area
+
+
+def overlap(x1, w1, x2, w2):
+    l1 = x1 - (w1 / 2.)
+    l2 = x2 - (w2 / 2.)
+    r1 = x1 + (w1 / 2.)
+    r2 = x2 + (w2 / 2.)
+    left = l1 if l1 >= l2 else l2
+    right = r1 if r1 <= r2 else r2
+    return right - left
+
+
+def box_union(b1, b2):
+    intersect = box_intersection(b1, b2)
+    union = (b1.w * b1.h) + (b2.w * b2.h) - intersect
+    return union
 
 
 if __name__ == "__main__":

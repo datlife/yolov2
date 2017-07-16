@@ -1,5 +1,5 @@
 from keras.layers.merge import concatenate
-from keras.layers import MaxPool2D, GlobalAvgPool2D, Input
+from keras.layers import MaxPool2D, Input
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Conv2D, BatchNormalization, Lambda
 from keras.models import Model
