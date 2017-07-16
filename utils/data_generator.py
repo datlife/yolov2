@@ -84,7 +84,8 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
             X, Y = shuffle(X, Y)
             X = np.array(X)
             Y = np.array(Y)
-
+	    Y = np.expand_dims(Y, 1)
+	    Y = np.expand_dims(Y, 1)
             iterations = list(range(int(len(X) / batch_size)))
             for z in iterations:
                 yield X[z * batch_size:(z * batch_size) + batch_size], Y[z * batch_size:(z * batch_size) + batch_size]
