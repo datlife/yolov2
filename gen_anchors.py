@@ -12,8 +12,8 @@ Requirements
 Example:
 --------
 
-python generate_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
-python generate_anchors.py -n 5 -p training.txt -w 1280 -h 960
+python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
+python gen_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
 import numpy as np
