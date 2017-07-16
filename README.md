@@ -24,14 +24,13 @@ Download: [YOLOv2 Keras Weights]()
 ```
 ## Train on custom data set
         
-**Step 1: Pre-process training data**
+**Step 1: Prepares training data**
 
-Input file: a `.txt` file  as following format
+In this project, we only accept training input file as text file as following format:
       
         path/to/image1.jpg, x1, y1, x2, y2, class_name1
         path/to/image2.jpg, x1, y1, x2, y2, class_name3
         path/to/image3.jpg, x1, y1, x2, y2, class_name4
-        ...
         ...
         path/to/imagen.jpg, x1, y2, x2, y2, class_name6
         
