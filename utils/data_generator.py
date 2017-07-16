@@ -48,7 +48,7 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
                 if not os.path.isfile(filename):
                     print('Image Not Found')
                     continue
-                img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
+                img = cv2.imread(filename)
                 height, width, _ = img.shape
 
                 # Prep-rocess image **IMPORTANT
@@ -84,8 +84,6 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
             X, Y = shuffle(X, Y)
             X = np.array(X)
             Y = np.array(Y)
-            l_shape = np.shape(Y)
-            Y = np.tile(Y, (1, GRID_H*GRID_W*len(anchors))).reshape([l_shape[0], GRID_W*GRID_H, len(anchors), l_shape[1]])
 
             iterations = list(range(int(len(X) / batch_size)))
             for z in iterations:
