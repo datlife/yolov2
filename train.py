@@ -24,23 +24,22 @@ parser.add_argument('--epochs',  help='Steps of training', type=int, default=10)
 parser.add_argument('--batch',   type=int, default=8)
 parser.add_argument('--learning_rate','-lr', type=float, default=1e-5)
 
-# LOAD DATA
-lisa_path        = "/home/ubuntu/dataset/training/"   # Remember the `/` at the end
-
-x_train, y_train = load_data('training.txt')
-labels           = np.unique(y_train[:, 1])
-num_classes      = len(labels)            # Count number of classes in the data set
-print("Train: {} samples\nNumber of classes: {}".format(len(x_train), num_classes))
-print("\n\nAnchors using K-mean clustering [K=5]\n {}".format(ANCHORS))
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
     BATCH_SIZE      = args.batch
+    TRAINING_PATH   = args.path
     LEARNING_RATE   = args.learning_rate
     EPOCHS          = args.epoches
     pretrained_path = args.model
     weights         = args.weights
+
+    x_train, y_train = load_data(TRAINING_PATH)
+    labels           = np.unique(y_train[:, 1])
+    num_classes      = len(labels)            # Count number of classes in the data set
+    print("Train: {} samples\nNumber of classes: {}".format(len(x_train), num_classes))
+    print("\n\nAnchors using K-mean clustering [K=5]\n {}".format(ANCHORS))
 
     # CONSTRUCT MODEL
     darknet19 = darknet19(pretrained_path, freeze_layers=True)
