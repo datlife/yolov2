@@ -10,6 +10,7 @@ from keras.optimizers import Adam
 from utils.parse_input import load_data    # Data handler for LISA data set
 from model.yolov2 import YOLOv2, darknet19
 from model.loss import custom_loss
+from model.metrics import avg_iou, coor, obj
 from utils.data_generator import flow_from_list
 from utils.multi_gpu import make_parallel, get_gpus
 from cfg import *
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     BATCH_SIZE      = args.batch
     TRAINING_PATH   = args.path
     LEARNING_RATE   = args.learning_rate
-    EPOCHS          = args.epoches
+    EPOCHS          = args.epochs
     pretrained_path = args.model
     weights         = args.weights
 
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     else:
         model_par = model
 
-    model_par.compile(optimizer=Adam(LEARNING_RATE), loss=custom_loss)
+    model_par.compile(optimizer=Adam(LEARNING_RATE), loss=custom_loss, metrics=[avg_iou,coor,obj])
 
     train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
     # TRAINING
@@ -72,9 +73,9 @@ if __name__ == "__main__":
     # @TODO :model checkpoint save single-instance model
     hist = model_par.fit_generator(generator=train_data_gen,
                                    steps_per_epoch=3*len(x_train) / BATCH_SIZE,
-                                   epochs=40,
+                                   epochs=EPOCHS,
                                    callbacks=[tf_board, early_stop, save_model],
                                    workers=1, verbose=1,
-                                   initial_epoch=20)
+                                   initial_epoch=0)
 
     model.save_weights('yolov2.weights')
