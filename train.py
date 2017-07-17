@@ -60,7 +60,7 @@ if __name__ == "__main__":
     else:
         model_par = model
 
-    model_par.compile(optimizer=Adam(LEARNING_RATE), loss=custom_loss, metrics=[avg_iou,coor,obj])
+    model_par.compile(optimizer=Adam(LEARNING_RATE), loss=custom_loss)
 
     train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
     # TRAINING
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                                    steps_per_epoch=3*len(x_train) / BATCH_SIZE,
                                    epochs=EPOCHS,
                                    callbacks=[tf_board, early_stop, save_model],
-                                   workers=1, verbose=1,
+                                   workers=4, verbose=1,
                                    initial_epoch=0)
 
     model.save_weights('yolov2.weights')

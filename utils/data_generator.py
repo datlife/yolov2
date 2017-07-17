@@ -4,13 +4,40 @@ Data Handler for Training Deep Learning Model
 import os
 import cv2
 import pandas as pd
+import logging
+import threading
 from sklearn.utils import shuffle
 
 from utils.box import Box, convert_bbox
 from utils.image_handler import random_transform, preprocess_img
 from cfg import *
 
+#################### Now make the data generator threadsafe ####################
 
+class threadsafe_iter:
+    """Takes an iterator/generator and makes it thread-safe by
+    serializing call to the `next` method of given iterator/generator.
+    """
+    def __init__(self, it):
+        self.it = it
+        self.lock = threading.Lock()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        with self.lock:
+            return self.it.next()
+
+
+def threadsafe_generator(f):
+    """A decorator that takes a generator function and makes it thread-safe.
+    """
+    def g(*a, **kw):
+        return threadsafe_iter(f(*a, **kw))
+    return g
+
+@threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
     A ImageGenerator from image paths and return (images, labels) by batch_size
