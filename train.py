@@ -1,3 +1,10 @@
+"""
+Training YOLOv2
+
+Example:
+--------
+
+"""
 import keras
 from keras.optimizers import Adam
 from utils.parse_input import load_data    # Data handler for LISA data set

@@ -12,7 +12,7 @@ from utils.image_handler import random_transform, preprocess_img
 from cfg import *
 
 
-def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=True):
+def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
     A ImageGenerator from image paths and return (images, labels) by batch_size
 
@@ -21,7 +21,6 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
     :param x: list of image paths 
     :param y: list of labels as [Box, label_name]
 
-    :param anchors:        list of anchors
     :param scaling_factor: the level of augmentation. The higher, the more data being augmented
     :param batch_size:     number of images yielded every iteration
     :param augment_data:   enable data augmentation
@@ -39,25 +38,28 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
     while True:
         x, y = shuffle(x, y)  # Shuffle DATA to avoid over-fitting
         for i in list(range(slices)):
-            fnames = x[i * batch_size:(i * batch_size) + batch_size]
+            f_name = x[i * batch_size:(i * batch_size) + batch_size]
             labels = y[i * batch_size:(i * batch_size) + batch_size]
             X = []
             Y = []
-            for filename, label in list(zip(fnames, labels)):
+            for filename, label in list(zip(f_name, labels)):
                 bbox, label = label
+
                 if not os.path.isfile(filename):
                     print('Image Not Found')
                     continue
-                img = cv2.imread(filename)
+                img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
 
-                # Prep-rocess image **IMPORTANT
+                # @TODO multi-scale training
                 processed_img = preprocess_img(img)
 
                 # convert label to int
                 index_label = np.where(categories == label)[0][0]
                 one_hot = np.eye(len(categories))[index_label]
-                box = bbox.to_abs_size(img_size=(width, height))
+
+                # convert to relative
+                box = bbox.to_relative_size((width, height))
                 X.append(processed_img)
                 Y.append(np.concatenate([np.array(box), [0.0], one_hot]))
 
@@ -75,20 +77,33 @@ def flow_from_list(x, y, anchors, batch_size=32, scaling_factor=5, augment_data=
 
                         processed_img = preprocess_img(aug_img)
                         aug_box = convert_opencv_to_box(aug_box)
+                        aug_box = aug_box.to_relative_size((width, height))
 
-                        aug_box = aug_box.to_abs_size(img_size=(width, height))
                         X.append(processed_img)
                         Y.append(np.asarray(np.concatenate([np.array(aug_box), [0.0], one_hot])))
 
             # Shuffle X, Y again
-            X, Y = shuffle(X, Y)
-            X = np.array(X)
-            Y = np.array(Y)
-	    Y = np.expand_dims(Y, 1)
-	    Y = np.expand_dims(Y, 1)
-            iterations = list(range(int(len(X) / batch_size)))
-            for z in iterations:
-                yield X[z * batch_size:(z * batch_size) + batch_size], Y[z * batch_size:(z * batch_size) + batch_size]
+            X, Y = shuffle(np.array(X), np.array(Y))
+            for z in list(range(int(len(X) / batch_size))):
+                grid_w = width / SHRINK_FACTOR
+                grid_h = height / SHRINK_FACTOR
+
+                # Construct detection mask
+                y_batch = np.zeros((batch_size, grid_w, grid_h, N_ANCHORS, 5 + N_CLASSES))
+
+                labels = Y[z * batch_size:(z * batch_size) + batch_size]
+                for b in range(batch_size):
+                    center_x = labels[b][..., 0] / (float(width) / grid_w)
+                    center_y = labels[b][..., 1] / (float(height) / grid_h)
+
+                    c = int(np.floor(center_x))
+                    r = int(np.floor(center_y))
+
+                    if r < grid_w and c < grid_h:
+                        y_batch[b, r, c, :, 0:4] = N_ANCHORS * [labels[b][..., :4]]
+                        y_batch[b, r, c, :, 4] = N_ANCHORS * [1.0]
+                        y_batch[b, r, c, :, 5:] = N_ANCHORS * [labels[b][..., 5:]]
+                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, grid_h * grid_w, N_ANCHORS, N_CLASSES + 5])
 
 
 def calc_augment_level(y, scaling_factor=5):

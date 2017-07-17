@@ -28,10 +28,10 @@ class Box(object):
         :return: 
         """
         width, height = img_size
-        xc = self.x/(1.* width)
-        yc = self.y/(1.* height)
-        w  = self.w/(1.* width)
-        h  = self.h/(1.* height)
+        xc = self.x/(1. * width)
+        yc = self.y/(1. * height)
+        w  = self.w/(1. * width)
+        h  = self.h/(1. * height)
         return xc, yc, w, h
 
     def to_abs_size(self, img_size=(1280, 960)):
@@ -45,11 +45,14 @@ class Box(object):
         if self.x > 1.0:  # Make sure current box is in relative format
             return self.x, self.y, self.w, self.h
 
-        xc = self.x   * width
-        yc = self.y   * height
-        w  = self.w   * width
-        h  = self.h   * height
-        return xc, yc, w, h
+        self.x = self.x   * width
+        self.y = self.y   * height
+        self.w  = self.w   * width
+        self.h  = self.h   * height
+        return self.x, self.y, self.w, self.h
+
+    def to_array(self):
+        return np.array((self.x, self.y, self.w, self.h))
 
     def __str__(self):
         return "{} {} {} {}".format(self.x, self.y, self.w, self.h)
