@@ -9,7 +9,7 @@ def random_transform(img, bbox):
     a = np.random.randint(0, 2, [1, 3]).astype('bool')[0]
     aug_box = bbox
     if a[0] == 1:
-        img, aug_box = shear(img, bbox)
+        # img, aug_box = shear(img, bbox)
     if a[1] == 1:
         img = blur(img)
     if a[2] == 1:
