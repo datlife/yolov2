@@ -18,30 +18,39 @@ from argparse import ArgumentParser
 parser = ArgumentParser(description="Train YOLOv2")
 
 parser.add_argument('--path',    help="training data in txt format",type=str,  default='training.txt')
+parser.add_argument('--weights', type=str, default=None)
 parser.add_argument('--model',   help="Pretrained Weights", type=str,  default='/home/ubuntu/dataset/darknet19_544.weights')
 parser.add_argument('--epochs',  help='Steps of training', type=int, default=10)
+parser.add_argument('--batch',   type=int, default=8)
+parser.add_argument('--learning_rate','-lr', type=float, default=1e-5)
 
 # LOAD DATA
 lisa_path        = "/home/ubuntu/dataset/training/"   # Remember the `/` at the end
-pretrained_path  = "/home/ubuntu/dataset/darknet19_544.weights"
 
 x_train, y_train = load_data('training.txt')
 labels           = np.unique(y_train[:, 1])
 num_classes      = len(labels)            # Count number of classes in the data set
-train_data_gen   = flow_from_list(x_train, y_train, ANCHORS, batch_size=BATCH_SIZE, augment_data=True)
 print("Train: {} samples\nNumber of classes: {}".format(len(x_train), num_classes))
 print("\n\nAnchors using K-mean clustering [K=5]\n {}".format(ANCHORS))
 
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+    BATCH_SIZE      = args.batch
+    LEARNING_RATE   = args.learning_rate
+    EPOCHS          = args.epoches
+    pretrained_path = args.model
+    weights         = args.weights
 
     # CONSTRUCT MODEL
     darknet19 = darknet19(pretrained_path, freeze_layers=True)
     yolov2    = YOLOv2(feature_extractor=darknet19, num_anchors=len(ANCHORS), num_classes=N_CLASSES)
     model     = yolov2.model
     model.summary()
+
     # LOAD PRE-TRAINED MODEL
-    model.load_weights('model.weights')
+    if weights:
+        model.load_weights(weights)
 
     # TRAIN ON MULTI-GPUS
     n_gpus = get_gpus()
@@ -51,15 +60,21 @@ if __name__ == "__main__":
     else:
         model_par = model
 
-    model_par.compile(optimizer=Adam(LEARN_RATE), loss=custom_loss)
+    model_par.compile(optimizer=Adam(LEARNING_RATE), loss=custom_loss)
 
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
     # TRAINING
     tf_board = keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
-    # @TODO :model checkpoint save signle-instance mocel
+    early_stop = keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.00001, patience=3, mode='min', verbose=1)
+    save_model = keras.callbacks.LambdaCallback(
+        on_epoch_end=lambda epoch, logs: model.save_weights(
+            '/home/ubuntu/dataset/backup/yolov2-epoch%s-loss:%s.weights' % (epoch, str(logs.get('loss')))))
+
+    # @TODO :model checkpoint save single-instance model
     hist = model_par.fit_generator(generator=train_data_gen,
                                    steps_per_epoch=3*len(x_train) / BATCH_SIZE,
                                    epochs=40,
-                                   callbacks=[tf_board],
+                                   callbacks=[tf_board, early_stop, save_model],
                                    workers=1, verbose=1,
                                    initial_epoch=20)
 

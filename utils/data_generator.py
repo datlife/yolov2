@@ -4,7 +4,6 @@ Data Handler for Training Deep Learning Model
 import os
 import cv2
 import pandas as pd
-import numpy as np
 from sklearn.utils import shuffle
 
 from utils.box import Box, convert_bbox
@@ -87,23 +86,24 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             for z in list(range(int(len(X) / batch_size))):
                 grid_w = width / SHRINK_FACTOR
                 grid_h = height / SHRINK_FACTOR
-
                 # Construct detection mask
-                y_batch = np.zeros((batch_size, grid_w, grid_h, N_ANCHORS, 5 + N_CLASSES))
+                y_batch = np.zeros((batch_size, grid_h, grid_w, N_ANCHORS, 5 + N_CLASSES))
 
                 labels = Y[z * batch_size:(z * batch_size) + batch_size]
+                # print("Grid W {} || GRID_H {}".format(grid_w, grid_h))
                 for b in range(batch_size):
-                    center_x = labels[b][..., 0] / (float(width) / grid_w)
-                    center_y = labels[b][..., 1] / (float(height) / grid_h)
-
-                    c = int(np.floor(center_x))
-                    r = int(np.floor(center_y))
+                    # Find the grid cell where the centroid locate
+                    center_x = labels[b][0] * grid_w
+                    center_y = labels[b][1] * grid_h
+                    r = int(np.floor(center_x))
+                    c = int(np.floor(center_y))
 
                     if r < grid_w and c < grid_h:
-                        y_batch[b, r, c, :, 0:4] = N_ANCHORS * [labels[b][..., :4]]
-                        y_batch[b, r, c, :, 4] = N_ANCHORS * [1.0]
-                        y_batch[b, r, c, :, 5:] = N_ANCHORS * [labels[b][..., 5:]]
-                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, grid_h * grid_w, N_ANCHORS, N_CLASSES + 5])
+                        y_batch[b, c, r, :, 0:4] = N_ANCHORS * [labels[b][..., :4]]
+                        y_batch[b, c, r, :, 4]   = N_ANCHORS * [1.0]
+                        y_batch[b, c, r, :, 5:]  = N_ANCHORS * [labels[b][..., 5:]]
+#                         print(b, c, r)
+                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, grid_h, grid_w, N_ANCHORS*(N_CLASSES + 5)])
 
 
 def calc_augment_level(y, scaling_factor=5):
