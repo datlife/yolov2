@@ -111,7 +111,7 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     detector     = conv_block(detector,    1024, (3, 3))
 
     i            = conv_block(fine_grained, 64,  (1, 1))      # concatenate pass-through layer with current conv layer
-    reshaped     = Lambda(func_reshape, get_output_shape)(i)
+    reshaped     = Lambda(func_reshape, get_output_shape, name='space_to_depth_x2')(i)
     detector     = concatenate([reshaped, detector])
 
     detector     = conv_block(detector,    1024, (3, 3))

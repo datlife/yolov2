@@ -75,6 +75,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 randint = np.random.random_integers(low=0, high=(len(MULTI_SCALE) - 1))
                 multi_scale = MULTI_SCALE[randint]
                 print("Multi-scale updated to ", multi_scale)
+
             for filename, label in list(zip(f_name, labels)):
                 bbox, label = label
 
@@ -86,9 +87,10 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
                 # Multi-scale training
                 if augment_data:
-                    height = int(height * multi_scale)
-                    width  = int(width  * multi_scale)
-                    img = cv2.resize(img, (width, height))
+                    new_height = int(height * multi_scale)
+                    new_width  = int(width  * multi_scale)
+                    img = cv2.resize(img, (new_width, new_height))
+
                 processed_img = preprocess_img(img)
 
                 # convert label to int
@@ -96,12 +98,13 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 one_hot = np.eye(len(CATEGORIES))[index_label]
 
                 # convert to relative
-                box = bbox.to_relative_size((width, height))
+                box = bbox.to_relative_size((float(width), float(height)))
                 X.append(processed_img)
                 Y.append(np.concatenate([np.array(box), [0.0], one_hot]))
 
                 if augment_data is True:
                     aug_level = augment_level.loc[augment_level['label'] == label, 'scaling_factor'].values[0]
+
                     for l in list(range(aug_level)):
                         # Create new image & bounding box
                         aug_img, aug_box = random_transform(img, bbox.to_opencv_format())
@@ -112,9 +115,9 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                         if np.any(p1 < 0) or np.any(p2 < 0):
                             continue
 
-                        processed_img = preprocess_img(aug_img)
+                        psrocessed_img = preprocess_img(aug_img)
                         aug_box = convert_opencv_to_box(aug_box)
-                        aug_box = aug_box.to_relative_size((width, height))
+                        aug_box = aug_box.to_relative_size((float(width), float(height)))
 
                         X.append(processed_img)
                         Y.append(np.asarray(np.concatenate([np.array(aug_box), [0.0], one_hot])))
@@ -122,8 +125,9 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             # Shuffle X, Y again
             X, Y = shuffle(np.array(X), np.array(Y))
             for z in list(range(int(len(X) / batch_size))):
-                grid_w = width / SHRINK_FACTOR
-                grid_h = height / SHRINK_FACTOR
+                grid_w = new_width  / SHRINK_FACTOR
+                grid_h = new_height / SHRINK_FACTOR
+
                 # Construct detection mask
                 y_batch = np.zeros((batch_size, grid_h, grid_w, N_ANCHORS, 5 + N_CLASSES))
 
