@@ -12,7 +12,8 @@ from utils.box import Box, convert_bbox
 from utils.image_handler import random_transform, preprocess_img
 from cfg import *
 
-#################### Now make the data generator threadsafe ####################
+# ################### Now make the data generator threadsafe ####################
+
 
 class threadsafe_iter:
     """Takes an iterator/generator and makes it thread-safe by
@@ -37,6 +38,7 @@ def threadsafe_generator(f):
         return threadsafe_iter(f(*a, **kw))
     return g
 
+
 @threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
@@ -60,7 +62,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     slices = int(len(x) / batch_size)
     if augment_data is True:
         augment_level = calc_augment_level(y, scaling_factor)  # (less data / class means more augmentation)
-    categories = np.unique(y[:, 1])
+
     while True:
         x, y = shuffle(x, y)  # Shuffle DATA to avoid over-fitting
         for i in list(range(slices)):
@@ -68,6 +70,11 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             labels = y[i * batch_size:(i * batch_size) + batch_size]
             X = []
             Y = []
+
+            if i % 10 == 0 and augment_data is True:
+                randint = np.random.random_integers(low=0, high=(len(MULTI_SCALE) - 1))
+                multi_scale = MULTI_SCALE[randint]
+                print("Multi-scale updated to ", multi_scale)
             for filename, label in list(zip(f_name, labels)):
                 bbox, label = label
 
@@ -77,12 +84,16 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
 
-                # @TODO multi-scale training
+                # Multi-scale training
+                if augment_data:
+                    height = int(height * multi_scale)
+                    width  = int(width  * multi_scale)
+                    img = cv2.resize(img, (width, height))
                 processed_img = preprocess_img(img)
 
                 # convert label to int
-                index_label = np.where(categories == label)[0][0]
-                one_hot = np.eye(len(categories))[index_label]
+                index_label = np.where(CATEGORIES == label)[0][0]
+                one_hot = np.eye(len(CATEGORIES))[index_label]
 
                 # convert to relative
                 box = bbox.to_relative_size((width, height))
