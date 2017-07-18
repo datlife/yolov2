@@ -27,7 +27,7 @@ def custom_loss(y_true, y_pred):
 
     # Weight Terms
     weight_coor = 5.0 * tf.concat(4 * [true_conf], 4)
-    weight_conf = 5.0 * true_conf + 0.1 * (1. - true_conf)
+    weight_conf = 5.0 * true_conf + 0.1* (1. - true_conf)
     weight_prob = 5.0 * tf.concat(N_CLASSES * [true_conf], 4)
     weight_terms = tf.concat([weight_coor, weight_conf, weight_prob], 4)
 

@@ -79,6 +79,6 @@ if __name__ == "__main__":
                                    epochs=EPOCHS,
                                    callbacks=[tf_board, early_stop, save_model],
                                    workers=8, verbose=1,
-                                   initial_epoch=0)
+                                   initial_epoch=10)
 
     model.save_weights('yolov2.weights')
