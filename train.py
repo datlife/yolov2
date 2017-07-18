@@ -61,24 +61,34 @@ if __name__ == "__main__":
         model_par = model
 
     # optimizer =Adam(LEARNING_RATE)
-    optimizer = SGD(lr=0.00001, decay=0.0005, momentum=0.9)
+    optimizer = SGD(lr=LEARNING_RATE, decay=0.0005, momentum=0.9)
 
     model_par.compile(optimizer=optimizer, loss=custom_loss, metrics=[avg_iou, coor])
 
     train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
+
+    # Learning Rate Scheduler
+    def schedule(epoch):
+        if epoch==60:
+            return float(0.00001)
+        if epoch==90:
+            return float(0.000001)
+        else:
+            return LEARNING_RATE
+
     # TRAINING
     tf_board = keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
-    early_stop = keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.00001, patience=3, mode='min', verbose=1)
+    lr_scheduler= keras.callbacks.LearningRateScheduler(schedule)
     save_model = keras.callbacks.LambdaCallback(
         on_epoch_end=lambda epoch, logs: model.save_weights(
-            '/home/ubuntu/dataset/backup/yolov2-epoch%s-loss:%s.weights' % (epoch, str(logs.get('loss')))))
+            '/home/ubuntu/dataset/backup/yolov2-epoch%s-loss{%s}.weights' % (epoch, str(logs.get('loss')))))
 
     # @TODO :model checkpoint save single-instance model
     hist = model_par.fit_generator(generator=train_data_gen,
                                    steps_per_epoch=100,
                                    epochs=EPOCHS,
-                                   callbacks=[tf_board, early_stop, save_model],
+                                   callbacks=[tf_board, save_model, lr_scheduler],
                                    workers=8, verbose=1,
-                                   initial_epoch=10)
+                                   initial_epoch=0)
 
     model.save_weights('yolov2.weights')
