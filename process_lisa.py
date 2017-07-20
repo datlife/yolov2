@@ -8,13 +8,13 @@ abs_image_path, x1, y1, x2, y2, label
 Usage:
 -----
 
-python process_lisa.py -p absolute/path/to/lisa/training
+python process_lisa.py -p ../lisa/training
 
 eg:
-python process_lisa.py -p /home/ubuntu/dataset/training
+python process_lisa.py -p ../lisa/training
 
 
-It will create a text file training.txt for training on YOLOv2
+It will create a text file 'training.txt' for training on YOLOv2
 """
 import pandas as pd
 import os
@@ -56,21 +56,31 @@ def load_lisa_data(path=None):
 
     if not os.path.isdir(path):
         raise IOError("Path does not exist")
+    
 
     # Get all .csv file(s) in given path (including sub-directories)
     csv_files = glob.glob(path + "*.csv")
+    if len(csv_files) is 0:
+        raise ValueError("No CSV were found in dataset.")
+    else:
+        print('Found %s CSV Files in dataset'%(len(csv_files)))
+
+    print("Obtaining absolute path to dataset...")
+    # Get absolute path to dataset
+    path = os.path.abspath(path)
+    print(path)
     X = []
     Y = []
     for fl in csv_files:
         df = pd.read_csv(fl, sep=';|,', engine='python')  # Convert csv to panda data frames
-        X.append(path + df['Filename'])  # Convert to absolute path
+        X.append(path +'/'+df['Filename'])  # Convert to absolute path
         Y.append(df.loc[:, 'Annotation tag': 'Lower right corner Y'])  # Extract only labels [class, x1, y1, x2, y2]
 
     X = pd.concat(X)
     Y = pd.concat(Y)
     # Re-arrange order of pandas frame
     Y = Y[['Upper left corner X', 'Upper left corner Y', 'Lower right corner X', 'Lower right corner Y', 'Annotation tag']]
-
+    print("Done parsing input")
     return X, Y
 
 if __name__ == "__main__":

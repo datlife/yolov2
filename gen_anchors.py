@@ -18,12 +18,12 @@ python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280
 python gen_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
-# -*- coding: utf-8 -*-
 
 import numpy as np
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
 from cfg import *
+
 
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
@@ -110,8 +110,8 @@ def run_k_mean(n_anchors, boxes, centroids):
         group_index = 0
 
         for i, centroid in enumerate(centroids):
-            distance = 1 - box_iou(box, centroid)  # <-- used in YOLO9000
-            if distance < min_distance:
+            distance = 1 - box_iou(box, centroid) # Used in YOLO9000
+            if (distance < min_distance):
                 min_distance = distance
                 group_index = i
 
