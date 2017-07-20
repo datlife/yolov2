@@ -1,3 +1,5 @@
+# coding: utf-8
+
 """
 This script will generate anchors based on your training bounding boxes.
 
@@ -21,24 +23,23 @@ s
 import numpy as np
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
+from cfg import *
+
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
-
-parser.add_argument('--num_anchors', '-n', type=int,   default=5, help="Number of anchors")
-parser.add_argument('--label_path',  '-p', type='str', default='../data/training.txt', help="Training txt file")
-parser.add_argument('--img_width',   '-w', type=int,   default=1280, help='Image width')
-parser.add_argument('--img_height',  '-h', type=int,   default=960, help='Image height')
-parser.add_argument('--loss',        '-l', type=float, default=1e-5,   help="Loss Convergence value")
+parser.add_argument('-n', '--num_anchors',
+                    type=int,   default=5,
+                    help="Number of anchors")
+parser.add_argument('-p',
+                    '--label_path',
+                    type=str, default='data/training.txt',
+                    help="Path to Training txt file")
 
 
 def __main__():
     args = parser.parse_args()
     k            = args.num_anchors
     label_path   = args.label_path
-    loss_conv    = args.loss
-    img_width    = args.img_width
-    img_height   = args.img_height
-    img_size     = (img_width, img_height, 3)
     gt_boxes     = []
 
     # Extract bounding boxes from training data
@@ -47,17 +48,15 @@ def __main__():
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
-            xc, yc, w, h = scale_rel_box(img_size, Box(xc, yc, w, h))
             gt_boxes.append(Box(0, 0, float(w), float(h)))
 
     # ############## K-MEAN CLUSTERING ########################
-    anchors, avg_iou = k_mean_cluster(k, gt_boxes, loss_convergence=loss_conv)
+    anchors, avg_iou = k_mean_cluster(k, gt_boxes)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
     # print result
-    print("Anchors box result [relative size]:\n")
     for anchor in anchors:
-        print("({}, {})".format(anchor.w, anchor.h))
+        print("({}, {})".format(anchor.w / SHRINK_FACTOR, anchor.h / SHRINK_FACTOR))
 
 
 def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
@@ -111,8 +110,8 @@ def run_k_mean(n_anchors, boxes, centroids):
         group_index = 0
 
         for i, centroid in enumerate(centroids):
-            distance = 1 - box_iou(box, centroid)
-            if (distance < min_distance):
+            distance = 1 - box_iou(box, centroid)  # <-- used in YOLO9000
+            if distance < min_distance:
                 min_distance = distance
                 group_index = i
 
@@ -144,20 +143,6 @@ def convert_bbox(x1, y1, x2, y2):
     h = float(y2) - float(y1)
     xc = float(x1) + w / 2.
     yc = float(y1) + h / 2.
-    return xc, yc, w, h
-
-
-def scale_rel_box(img_size, box):
-    """
-    Scale bounding box relative to image size
-    """
-    width, height, _ = img_size
-    dw = 1. / width
-    dh = 1. / height
-    xc = box.x * dw
-    yc = box.y * dh
-    w  = box.w * dw
-    h  = box.h * dh
     return xc, yc, w, h
 
 
