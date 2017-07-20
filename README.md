@@ -10,8 +10,8 @@ Download: [YOLOv2 Keras Weights]()
 - [x] Generate anchors using K-mean clustering on training data
 - [x] Convert DarkNet19 weights to Keras weights
 - [x] YOLOv2 Loss Function
-- [x] Multi-GPU(s) Training
 - [x] Multi-scale  Training
+- [ ] LSTM Tracker
 - [ ] Hierarchical Tree - Combine multiple data sets like YOLO9000 using
 - [ ] Train on any custom data set
 - [ ] Use MobileNet as feature extractor (super fast, accuracy ~ VGG-16)
