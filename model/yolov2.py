@@ -36,7 +36,7 @@ class YOLOv2(object):
         return yolov2
 
 
-def darknet19(pretrained_weights=None, freeze_layers=True):
+def darknet19(input_size=None, pretrained_weights=None, freeze_layers=True):
     """
      DarkNet-19 model
      :param img_size          : image size
@@ -46,7 +46,10 @@ def darknet19(pretrained_weights=None, freeze_layers=True):
      :return: 
         DarkNet19 model
      """
-    image = Input(shape=(None, None, 3))
+    if input_size is None:
+        image = Input(shape=(None, None, 3))
+    else:
+        image = Input(shape=input_size)
 
     x = conv_block(image, 32, (3, 3), padding='same')  # << --- Input layer
     x = MaxPool2D(strides=2)(x)

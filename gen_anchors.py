@@ -1,3 +1,5 @@
+# coding: utf-8
+
 """
 This script will generate anchors based on your training bounding boxes.
 
@@ -16,7 +18,6 @@ python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280
 python gen_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
-# -*- coding: utf-8 -*-
 
 import numpy as np
 from utils.box import Box, box_iou
@@ -24,11 +25,15 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
 
-parser.add_argument('--num_anchors', '-n', type=int,   default=5, help="Number of anchors")
-parser.add_argument('--label_path',  '-p', type='str', default='../data/training.txt', help="Training txt file")
-parser.add_argument('--img_width',   '-w', type=int,   default=1280, help='Image width')
-parser.add_argument('--img_height',  '-h', type=int,   default=960, help='Image height')
-parser.add_argument('--loss',        '-l', type=float, default=1e-5,   help="Loss Convergence value")
+
+parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
+parser.add_argument('-n', '--num_anchors',
+                    type=int,   default=5,
+                    help="Number of anchors")
+parser.add_argument('-p',
+                    '--label_path',
+                    type=str, default='data/training.txt',
+                    help="Path to Training txt file")
 
 
 def __main__():
@@ -111,7 +116,7 @@ def run_k_mean(n_anchors, boxes, centroids):
         group_index = 0
 
         for i, centroid in enumerate(centroids):
-            distance = 1 - box_iou(box, centroid)
+            distance = 1 - box_iou(box, centroid) # Used in YOLO9000
             if (distance < min_distance):
                 min_distance = distance
                 group_index = i
