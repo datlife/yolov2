@@ -12,34 +12,6 @@ from utils.box import Box, convert_bbox
 from utils.image_handler import random_transform, preprocess_img
 from cfg import *
 
-# ################### Now make the data generator threadsafe ####################
-
-
-class threadsafe_iter:
-    """Takes an iterator/generator and makes it thread-safe by
-    serializing call to the `next` method of given iterator/generator.
-    """
-    def __init__(self, it):
-        self.it = it
-        self.lock = threading.Lock()
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        with self.lock:
-            return self.it.next()
-
-
-def threadsafe_generator(f):
-    """A decorator that takes a generator function and makes it thread-safe.
-    """
-    def g(*a, **kw):
-        return threadsafe_iter(f(*a, **kw))
-    return g
-
-
-@threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
     A ImageGenerator from image paths and return (images, labels) by batch_size
@@ -70,11 +42,10 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             labels = y[i * batch_size:(i * batch_size) + batch_size]
             X = []
             Y = []
-
             if i % 10 == 0 and augment_data is True:
                 randint = np.random.random_integers(low=0, high=(len(MULTI_SCALE) - 1))
                 multi_scale = MULTI_SCALE[randint]
-                print("Multi-scale updated to ", multi_scale)
+                # print("Multi-scale updated to ", multi_scale)
 
             for filename, label in list(zip(f_name, labels)):
                 bbox, label = label
@@ -85,6 +56,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
 
+                # @TODO make sure image size is factor of 32
                 # Multi-scale training
                 if augment_data:
                     new_height = int(height * multi_scale)
@@ -100,7 +72,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 # convert to relative
                 box = bbox.to_relative_size((float(width), float(height)))
                 X.append(processed_img)
-                Y.append(np.concatenate([np.array(box), [0.0], one_hot]))
+                Y.append(np.concatenate([np.array(box), [1.0], one_hot]))
 
                 if augment_data is True:
                     aug_level = augment_level.loc[augment_level['label'] == label, 'scaling_factor'].values[0]
@@ -115,12 +87,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                         if np.any(p1 < 0) or np.any(p2 < 0):
                             continue
 
-                        psrocessed_img = preprocess_img(aug_img)
+                        processed_img = preprocess_img(aug_img)
                         aug_box = convert_opencv_to_box(aug_box)
                         aug_box = aug_box.to_relative_size((float(width), float(height)))
 
                         X.append(processed_img)
-                        Y.append(np.asarray(np.concatenate([np.array(aug_box), [0.0], one_hot])))
+                        Y.append(np.asarray(np.concatenate([np.array(aug_box), [1.0], one_hot])))
 
             # Shuffle X, Y again
             X, Y = shuffle(np.array(X), np.array(Y))
@@ -129,9 +101,10 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 grid_h = new_height / SHRINK_FACTOR
 
                 # Construct detection mask
-                y_batch = np.zeros((batch_size, grid_h, grid_w, N_ANCHORS, 5 + N_CLASSES))
+                y_batch = np.zeros((batch_size, int(grid_h), int(grid_w), N_ANCHORS, 5 + N_CLASSES))
 
                 labels = Y[z * batch_size:(z * batch_size) + batch_size]
+
                 # print("Grid W {} || GRID_H {}".format(grid_w, grid_h))
                 for b in range(batch_size):
                     # Find the grid cell where the centroid locate
@@ -145,7 +118,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                         y_batch[b, c, r, :, 4]   = N_ANCHORS * [1.0]
                         y_batch[b, c, r, :, 5:]  = N_ANCHORS * [labels[b][..., 5:]]
 #                         print(b, c, r)
-                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, grid_h, grid_w, N_ANCHORS*(N_CLASSES + 5)])
+                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, int(grid_h), int(grid_w), N_ANCHORS*(N_CLASSES + 5)])
 
 
 def calc_augment_level(y, scaling_factor=5):

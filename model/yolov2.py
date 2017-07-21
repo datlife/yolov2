@@ -1,8 +1,10 @@
 from keras.layers.merge import concatenate
-from keras.layers import MaxPool2D, Input
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers import Conv2D, BatchNormalization, Lambda
+from keras.layers import Conv2D
+from keras.layers import Lambda
+from keras.regularizers import l2
 from keras.models import Model
+from model.net_builder import conv_block
+from model.darknet19 import darknet19
 
 
 class YOLOv2(object):
@@ -11,13 +13,12 @@ class YOLOv2(object):
     """
     def __init__(self, feature_extractor=None, num_anchors=9, num_classes=31):
         """
-        
         :param feature_extractor: Any CNN Classifier. Y
                     YOLOv2 uses Darknet19 (last conv layer as output)
         :param num_anchors: int  
                     - number of anchors   
         :param num_classes: int 
-         \          - number of classes in training data
+                   - number of classes in training data
         """
         self.n_anchors = 9
         self.n_classes = 31
@@ -29,74 +30,16 @@ class YOLOv2(object):
         """
 
         features        = feature_extractor if (feature_extractor is not None) else darknet19(freeze_layers=True)
-        object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=-17)
+        object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=43)
 
-        yolov2 = Model(inputs=[feature_extractor.input], outputs=[object_detector])
+        YOLOv2 = Model(inputs=[feature_extractor.input], outputs=[object_detector])
 
-        return yolov2
+        return YOLOv2
 
 
-def darknet19(input_size=None, pretrained_weights=None, freeze_layers=True):
+def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer=43):
     """
-     DarkNet-19 model
-     :param img_size          : image size
-     :param pretrained_weights: a path to pretrained weights
-     :param freeze_layers:      boolean - Freeze layers during training
-     
-     :return: 
-        DarkNet19 model
-     """
-    if input_size is None:
-        image = Input(shape=(None, None, 3))
-    else:
-        image = Input(shape=input_size)
-
-    x = conv_block(image, 32, (3, 3), padding='same')  # << --- Input layer
-    x = MaxPool2D(strides=2)(x)
-
-    x = conv_block(x, 64, (3, 3))
-    x = MaxPool2D(strides=2)(x)
-
-    x = conv_block(x, 128, (3, 3))
-    x = conv_block(x, 64,  (1, 1))
-    x = conv_block(x, 128, (3, 3))
-    x = MaxPool2D(strides=2)(x)
-
-    x = conv_block(x, 256, (3, 3))
-    x = conv_block(x, 128, (1, 1))
-    x = conv_block(x, 256, (3, 3))
-    x = MaxPool2D(strides=2)(x)
-
-    x = conv_block(x, 512, (3, 3))
-    x = conv_block(x, 256, (1, 1))
-    x = conv_block(x, 512, (3, 3))
-    x = conv_block(x, 256, (1, 1))
-    x = conv_block(x, 512, (3, 3))
-    x = MaxPool2D(strides=2)(x)
-
-    x = conv_block(x, 1024, (3, 3))
-    x = conv_block(x, 512, (1, 1))
-    x = conv_block(x, 1024, (3, 3))
-    x = conv_block(x, 512, (1, 1))
-    x = conv_block(x, 1024, (3, 3))
-
-    # x = GlobalAvgPool2D(1000, (1, 1), )(x)  - disabled because we only need the last conv layer to extract features
-    feature_extractor = Model(image, x)
-
-    if pretrained_weights is not None:  # Load pre-trained weights from DarkNet19
-        feature_extractor.load_weights(pretrained_weights, by_name=True)
-        print("Pre-trained weights have been loaded into model")
-
-    if freeze_layers:
-        for layer in feature_extractor.layers:
-            layer.trainable = False
-
-    return feature_extractor
-
-
-def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer=-17):
-    """
-    Constructor for Box Regression Model for YOLOv2
+    Constructor for Box Regression Model (RPN-ish) for YOLOv2
     
     :param feature_extractor: 
     :param num_anchors:
@@ -113,41 +56,31 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     detector     = conv_block(feature_map, 1024, (3, 3))
     detector     = conv_block(detector,    1024, (3, 3))
 
-    i            = conv_block(fine_grained, 64,  (1, 1))      # concatenate pass-through layer with current conv layer
-    reshaped     = Lambda(func_reshape, get_output_shape, name='space_to_depth_x2')(i)
+    res_layer    = conv_block(fine_grained, 64,  (1, 1))  # concatenate pass-through layer with current conv layer
+    reshaped     = Lambda(space_to_depth_x2, space_to_depth_x2_output_shape,  # a hack to match size of two layers
+                          name='space_to_depth')(res_layer)
     detector     = concatenate([reshaped, detector])
 
     detector     = conv_block(detector,    1024, (3, 3))
-    detector     = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1), name='yolov2')(detector)
+    detector     = Conv2D(filters=(num_anchors * (num_classes + 5)),
+                          kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(detector)
 
     return detector
 
 
-def func_reshape(x):
+def space_to_depth_x2(x):
+    """Thin wrapper for Tensor flow space_to_depth with block_size=2."""
+    # Import currently required to make Lambda work.
     import tensorflow as tf
     return tf.space_to_depth(x, block_size=2)
 
 
-def get_output_shape(input_shape):
-    if input_shape[1]:
-        return input_shape[0], input_shape[1] // 2, input_shape[2] // 2, 4 * input_shape[3]
-    else:
-        return input_shape[0], None, None, 4 * input_shape[3]
-
-
-def conv_block(x, filters=32, kernel_size=(3, 3), padding='same'):
+def space_to_depth_x2_output_shape(input_shape):
+    """Determine space_to_depth output shape for block_size=2.
+    Note: For Lambda with TensorFlow backend, output shape may not be needed.
     """
-    Yolov2 Convolutional Block [Conv --> Batch Norm --> LeakyReLU]
-    :param x: 
-    :param filters: 
-    :param kernel_size: 
-    :param padding: 
-    :return: 
-    """
-    x = Conv2D(filters=filters, kernel_size=kernel_size, use_bias=False, padding=padding)(x)
-    x = BatchNormalization()(x)
-    x = LeakyReLU()(x)
-    return x
+    return (input_shape[0], input_shape[1] // 2, input_shape[2] // 2, 4 * input_shape[3]) if input_shape[1] else\
+           (input_shape[0], None, None, 4 * input_shape[3])
 
 
 # Test case
