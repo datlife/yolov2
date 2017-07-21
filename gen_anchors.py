@@ -22,8 +22,8 @@ s
 import numpy as np
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
+from cfg import *
 
-parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
 
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
@@ -40,10 +40,6 @@ def __main__():
     args = parser.parse_args()
     k            = args.num_anchors
     label_path   = args.label_path
-    loss_conv    = args.loss
-    img_width    = args.img_width
-    img_height   = args.img_height
-    img_size     = (img_width, img_height, 3)
     gt_boxes     = []
 
     # Extract bounding boxes from training data
@@ -52,17 +48,15 @@ def __main__():
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
-            xc, yc, w, h = scale_rel_box(img_size, Box(xc, yc, w, h))
             gt_boxes.append(Box(0, 0, float(w), float(h)))
 
     # ############## K-MEAN CLUSTERING ########################
-    anchors, avg_iou = k_mean_cluster(k, gt_boxes, loss_convergence=loss_conv)
+    anchors, avg_iou = k_mean_cluster(k, gt_boxes)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
     # print result
-    print("Anchors box result [relative size]:\n")
     for anchor in anchors:
-        print("({}, {})".format(anchor.w, anchor.h))
+        print("({}, {})".format(anchor.w / SHRINK_FACTOR, anchor.h / SHRINK_FACTOR))
 
 
 def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
@@ -149,20 +143,6 @@ def convert_bbox(x1, y1, x2, y2):
     h = float(y2) - float(y1)
     xc = float(x1) + w / 2.
     yc = float(y1) + h / 2.
-    return xc, yc, w, h
-
-
-def scale_rel_box(img_size, box):
-    """
-    Scale bounding box relative to image size
-    """
-    width, height, _ = img_size
-    dw = 1. / width
-    dh = 1. / height
-    xc = box.x * dw
-    yc = box.y * dh
-    w  = box.w * dw
-    h  = box.h * dh
     return xc, yc, w, h
 
 
