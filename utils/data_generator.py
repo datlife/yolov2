@@ -97,8 +97,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             # Shuffle X, Y again
             X, Y = shuffle(np.array(X), np.array(Y))
             for z in list(range(int(len(X) / batch_size))):
-                grid_w = new_width  / SHRINK_FACTOR
-                grid_h = new_height / SHRINK_FACTOR
+		if augment_data:
+                    grid_w = new_width  / SHRINK_FACTOR
+                    grid_h = new_height / SHRINK_FACTOR
+                else:
+		    grid_w =  608 / SHRINK_FACTOR
+		    grid_h =  608/SHRINK_FACTOR
 
                 # Construct detection mask
                 y_batch = np.zeros((batch_size, int(grid_h), int(grid_w), N_ANCHORS, 5 + N_CLASSES))

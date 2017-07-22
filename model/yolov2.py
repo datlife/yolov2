@@ -9,20 +9,27 @@ from model.darknet19 import darknet19
 
 class YOLOv2(object):
     """
-    Yolo V2 Model
+    Yolov2 Meta-Architecture
     """
     def __init__(self, feature_extractor=None, num_anchors=9, num_classes=31):
         """
-        :param feature_extractor: Any CNN Classifier. Y
-                    YOLOv2 uses Darknet19 (last conv layer as output)
+        :param feature_extractor: A high-level CNN Classifier. One can plug and update an new feature extractor
+                    e.g. :  Darknet19 (YOLOv2), MobileNet, ResNet-50
+                    **NOTE** Update the SHRINK_FACTOR accordingly (number of max-pooling layer)
         :param num_anchors: int  
                     - number of anchors   
         :param num_classes: int 
                    - number of classes in training data
         """
-        self.n_anchors = 9
-        self.n_classes = 31
+        self.n_anchors = num_anchors
+        self.n_classes = num_classes
         self.model     = self._construct_yolov2(feature_extractor, num_anchors, num_classes)
+
+    def loss(self):
+        raise NotImplemented
+
+    def predict(self):
+        raise NotImplemented
 
     def _construct_yolov2(self, feature_extractor, num_anchors, num_classes):
         """

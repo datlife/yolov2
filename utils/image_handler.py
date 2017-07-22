@@ -12,8 +12,8 @@ def random_transform(img, bbox):
         # img, aug_box = shear(img, bbox)
     if a[1] == 1:
         img = blur(img)
-    if a[2] == 1:
-        img = brightness(img)
+#    if a[2] == 1:
+ #       img = brightness(img)
     # GAN can apply here to create random occlusion and deformation
 
     return img, aug_box
