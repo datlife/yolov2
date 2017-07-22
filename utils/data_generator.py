@@ -55,12 +55,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                     continue
                 img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
+                img = cv2.resize(img, (608, 608))
 
-                # @TODO make sure image size is factor of 32
                 # Multi-scale training
                 if augment_data:
-                    new_height = int(height * multi_scale)
-                    new_width  = int(width  * multi_scale)
+                    new_height = int(608 * multi_scale)
+                    new_width  = int(608  * multi_scale)
                     img = cv2.resize(img, (new_width, new_height))
 
                 processed_img = preprocess_img(img)
@@ -107,7 +107,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
                 # print("Grid W {} || GRID_H {}".format(grid_w, grid_h))
                 for b in range(batch_size):
-                    # Find the grid cell where the centroid locate
+                    # Find the grid cell whe604re the centroid locate
                     center_x = labels[b][0] * grid_w
                     center_y = labels[b][1] * grid_h
                     r = int(np.floor(center_x))
