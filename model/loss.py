@@ -4,25 +4,36 @@ from cfg import *
 
 
 def custom_loss(y_true, y_pred):
+    """
+    Loss Function of YOLOv2
+    :param y_true: a Tensor  [batch_size, GRID_H, GRID_W, N_ANCHORS*(N_CLASSES + 5)] 
+    :param y_pred: a Tensor [bacth_size, GRID_H, GRID_H, N_ANCHOR*(N_CLASSES + 5)]
+    
+    :return: a scalar
+            loss value
+    """
     pred_shape = K.shape(y_pred)[1:3]
-    gt_shape   = K.shape(y_true)  # shape of ground truth value
-    GRID_H     = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
-    GRID_W     = tf.cast(pred_shape[1], tf.int32)
+    gt_shape = K.shape(y_true)  # shape of ground truth value
+    GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
+    GRID_W = tf.cast(pred_shape[1], tf.int32)
 
+    # Update anchor size
     output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
-    y_pred      = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
-    y_true      = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
+    y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
+    y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
 
+    # Grid Map to calculate offset
     c_xy = _create_offset_map(K.shape(y_pred))
 
+    # Scale anchors to correct aspect ratio
+    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
+    # Extract prediction output from network
     pred_box_xy = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
-
     # adjust confidence
     pred_box_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)
-
-    # adjust probability
+    # adjust probability @TODO: create hierarchical soft-max tree
     pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
 
     y_pred = tf.concat([pred_box_xy, pred_box_wh, pred_box_conf, pred_box_prob], 4)
@@ -75,11 +86,6 @@ def custom_loss(y_true, y_pred):
     loss = tf.reduce_sum(loss, 1)
     loss = .5 * tf.reduce_mean(loss)
 
-    # @TODO update scalar loss
-    tf.summary.scalar('average_iou', tf.reduce_mean(tf.reduce_sum(iou)))
-    tf.summary.scalar('localization_loss', 0.0)
-    tf.summary.scalar('classification_loss', 0.0)
-
     return loss
 
 
@@ -104,3 +110,130 @@ def _create_offset_map(output_shape):
     c_xy = K.cast(c_xy, tf.float32)
 
     return c_xy
+
+
+def avg_iou(y_true, y_pred):
+    pred_shape = K.shape(y_pred)[1:3]
+    gt_shape = K.shape(y_true)  # shape of ground truth value
+    GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
+    GRID_W = tf.cast(pred_shape[1], tf.int32)
+
+    output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
+    y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
+    y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
+
+    c_xy = _create_offset_map(K.shape(y_pred))
+    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
+
+    pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
+
+    # Adjust ground truth
+    center_xy = y_true[:, :, :, :, 0:2]
+    true_box_xy = center_xy
+    true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
+
+    # adjust confidence
+    pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
+    pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
+    pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
+    pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
+
+    true_tem_wh = tf.pow(true_box_wh, 2) * output_size
+    true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
+    true_box_ul = true_box_xy - 0.5 * true_tem_wh
+    true_box_bd = true_box_xy + 0.5 * true_tem_wh
+
+    intersect_ul = tf.maximum(pred_box_ul, true_box_ul)
+    intersect_br = tf.minimum(pred_box_bd, true_box_bd)
+    intersect_wh = intersect_br - intersect_ul
+    intersect_wh = tf.maximum(intersect_wh, 0.0)
+    intersect_area = intersect_wh[:, :, :, :, 0] * intersect_wh[:, :, :, :, 1]
+
+    iou = tf.truediv(intersect_area, true_box_area + pred_box_area - intersect_area)
+    return tf.reduce_sum(iou) / tf.to_float(gt_shape[0])
+
+
+def recall(y_true, y_pred):
+    pred_shape = K.shape(y_pred)[1:3]
+    gt_shape = K.shape(y_true)  # shape of ground truth value
+    GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
+    GRID_W = tf.cast(pred_shape[1], tf.int32)
+
+    output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
+    y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
+    y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
+
+    c_xy = _create_offset_map(K.shape(y_pred))
+    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
+
+    pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
+
+    # Adjust ground truth
+    center_xy = y_true[:, :, :, :, 0:2]
+    true_box_xy = center_xy
+    true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
+
+    # adjust confidence
+    pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
+    pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
+    pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
+
+    true_tem_wh = tf.pow(true_box_wh, 2) * output_size
+    true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
+    true_box_ul = true_box_xy - 0.5 * true_tem_wh
+    true_box_bd = true_box_xy + 0.5 * true_tem_wh
+
+    intersect_ul = tf.maximum(pred_box_ul, true_box_ul)
+    intersect_br = tf.minimum(pred_box_bd, true_box_bd)
+    intersect_wh = intersect_br - intersect_ul
+    intersect_wh = tf.maximum(intersect_wh, 0.0)
+    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
+
+    recall_value = tf.truediv(intersect_area, true_box_area)
+    return tf.reduce_sum(recall_value) / tf.to_float(gt_shape[0])
+
+
+def precision(y_true, y_pred):
+    pred_shape = K.shape(y_pred)[1:3]
+    gt_shape = K.shape(y_true)  # shape of ground truth value
+    GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
+    GRID_W = tf.cast(pred_shape[1], tf.int32)
+
+    output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
+    y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
+    y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
+
+    c_xy = _create_offset_map(K.shape(y_pred))
+    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
+
+    pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
+
+    # Adjust ground truth
+    center_xy = y_true[:, :, :, :, 0:2]
+    true_box_xy = center_xy
+    true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
+
+    # adjust confidence
+    pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
+    pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
+    pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
+    pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
+
+    true_tem_wh = tf.pow(true_box_wh, 2) * output_size
+    true_box_ul = true_box_xy - 0.5 * true_tem_wh
+    true_box_bd = true_box_xy + 0.5 * true_tem_wh
+
+    intersect_ul = tf.maximum(pred_box_ul, true_box_ul)
+    intersect_br = tf.minimum(pred_box_bd, true_box_bd)
+    intersect_wh = intersect_br - intersect_ul
+    intersect_wh = tf.maximum(intersect_wh, 0.0)
+    intersect_area = intersect_wh[:, :, :, :, 0] * intersect_wh[:, :, :, :, 1]
+
+    precision_value = tf.truediv(intersect_area, pred_box_area)
+    return tf.reduce_sum(precision_value) / tf.to_float(gt_shape[0])

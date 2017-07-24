@@ -2,7 +2,6 @@
 
 """
 This script will generate anchors based on your training bounding boxes.
-
 It will apply k-mean cluster through the boxes in training data to determine size (w, h) for K anchors (in YOLOv2, K = 5)
 
 Requirements
@@ -18,12 +17,10 @@ python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280
 python gen_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
-
-import numpy as np
+import cv2
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
 from cfg import *
-
 
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
@@ -34,12 +31,22 @@ parser.add_argument('-p',
                     '--label_path',
                     type=str, default='data/training.txt',
                     help="Path to Training txt file")
+parser.add_argument('-width',
+                    '--image_width',
+                    type=int, default=1280,
+                    help="Image Width")
+parser.add_argument('-height',
+                    '--image_height',
+                    type=int, default=960,
+                    help="Image Height")
 
 
 def __main__():
     args = parser.parse_args()
     k            = args.num_anchors
     label_path   = args.label_path
+    img_width    = args.image_width
+    img_height   = args.image_height
     gt_boxes     = []
 
     # Extract bounding boxes from training data
@@ -47,16 +54,24 @@ def __main__():
         lines = f.readlines()
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
+            # Update aspect ratio
+
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
-            gt_boxes.append(Box(0, 0, float(w), float(h)))
+            box = Box(0, 0, float(w) / img_width, float(h)/ img_height)
+            gt_boxes.append(box)
 
     # ############## K-MEAN CLUSTERING ########################
     anchors, avg_iou = k_mean_cluster(k, gt_boxes)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
     # print result
-    for anchor in anchors:
-        print("({}, {})".format(anchor.w / SHRINK_FACTOR, anchor.h / SHRINK_FACTOR))
+    a = np.array([[an.w, an.h] for an in anchors], dtype=np.float)
+    print(a)
+    a = a * [30., 40.]
+    print(a)
+    # for anchor in anchors:
+    #     print("({}, {})".format(anchor.w,
+    #                             anchor.h))
 
 
 def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):

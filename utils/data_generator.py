@@ -4,7 +4,6 @@ Data Handler for Training Deep Learning Model
 import os
 import cv2
 import pandas as pd
-import logging
 import threading
 from sklearn.utils import shuffle
 
@@ -12,6 +11,31 @@ from utils.box import Box, convert_bbox
 from utils.image_handler import random_transform, preprocess_img
 from cfg import *
 
+
+class threadsafe_iter:
+    """Takes an iterator/generator and makes it thread-safe by
+    serializing call to the `next` method of given iterator/generator.
+    """
+    def __init__(self, it):
+        self.it = it
+        self.lock = threading.Lock()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        with self.lock:
+            return self.it.next()
+
+
+def threadsafe_generator(f):
+    """A decorator that takes a generator function and makes it thread-safe.
+    """
+    def g(*a, **kw):
+        return threadsafe_iter(f(*a, **kw))
+    return g
+
+@threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
     A ImageGenerator from image paths and return (images, labels) by batch_size
@@ -55,12 +79,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                     continue
                 img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
-                img = cv2.resize(img, (608, 608))
+                img = cv2.resize(img, (IMG_INPUT, IMG_INPUT))
 
                 # Multi-scale training
                 if augment_data:
-                    new_height = int(608 * multi_scale)
-                    new_width  = int(608  * multi_scale)
+                    new_height = int(IMG_INPUT * multi_scale)
+                    new_width  = int(IMG_INPUT * multi_scale)
                     img = cv2.resize(img, (new_width, new_height))
 
                 processed_img = preprocess_img(img)
@@ -97,12 +121,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             # Shuffle X, Y again
             X, Y = shuffle(np.array(X), np.array(Y))
             for z in list(range(int(len(X) / batch_size))):
-		if augment_data:
+                if augment_data:
                     grid_w = new_width  / SHRINK_FACTOR
                     grid_h = new_height / SHRINK_FACTOR
                 else:
-		    grid_w =  608 / SHRINK_FACTOR
-		    grid_h =  608/SHRINK_FACTOR
+                    grid_w = IMG_INPUT / SHRINK_FACTOR
+                    grid_h = IMG_INPUT / SHRINK_FACTOR
 
                 # Construct detection mask
                 y_batch = np.zeros((batch_size, int(grid_h), int(grid_w), N_ANCHORS, 5 + N_CLASSES))
