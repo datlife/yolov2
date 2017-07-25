@@ -8,7 +8,7 @@ def custom_loss(y_true, y_pred):
     Loss Function of YOLOv2
     :param y_true: a Tensor  [batch_size, GRID_H, GRID_W, N_ANCHORS*(N_CLASSES + 5)] 
     :param y_pred: a Tensor [bacth_size, GRID_H, GRID_H, N_ANCHOR*(N_CLASSES + 5)]
-    
+
     :return: a scalar
             loss value
     """
@@ -17,7 +17,6 @@ def custom_loss(y_true, y_pred):
     GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
     GRID_W = tf.cast(pred_shape[1], tf.int32)
 
-    # Update anchor size
     output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
     y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
     y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
@@ -26,10 +25,9 @@ def custom_loss(y_true, y_pred):
     c_xy = _create_offset_map(K.shape(y_pred))
 
     # Scale anchors to correct aspect ratio
-    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
     # Extract prediction output from network
     pred_box_xy = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
     # adjust confidence
     pred_box_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)
@@ -121,12 +119,10 @@ def avg_iou(y_true, y_pred):
     output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
     y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
     y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
-
     c_xy = _create_offset_map(K.shape(y_pred))
-    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
 
     pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
 
     # Adjust ground truth
@@ -166,10 +162,9 @@ def recall(y_true, y_pred):
     y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
 
     c_xy = _create_offset_map(K.shape(y_pred))
-    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
 
     pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
 
     # Adjust ground truth
@@ -194,7 +189,7 @@ def recall(y_true, y_pred):
     intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
 
     recall_value = tf.truediv(intersect_area, true_box_area)
-    return tf.reduce_sum(recall_value) / tf.to_float(gt_shape[0])
+    return tf.reduce_sum(recall_value)
 
 
 def precision(y_true, y_pred):
@@ -208,10 +203,9 @@ def precision(y_true, y_pred):
     y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
 
     c_xy = _create_offset_map(K.shape(y_pred))
-    resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
 
     pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * tf.reshape(resized_anchors, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
 
     # Adjust ground truth

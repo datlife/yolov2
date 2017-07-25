@@ -32,6 +32,7 @@ def _main_():
     save_lisa_to_txt(lisa_path,save_file='./training.txt')
     print("A text file has been created.")
 
+
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     image_paths, labels = load_lisa_data(csv_path)
     df = pd.concat([image_paths, labels], axis=1)

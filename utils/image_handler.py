@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 
 def preprocess_img(img):
@@ -16,7 +17,7 @@ def random_transform(img, bbox):
     a = np.random.randint(0, 2, [1, 3]).astype('bool')[0]
     aug_box = bbox
     # if a[0] == 1:
-    #     img, aug_box = shear(img, bbox)
+    #     img, aug_box = rotate(img, bbox)
     if a[1] == 1:
         img = blur(img)
     if a[2] == 1:
@@ -25,44 +26,19 @@ def random_transform(img, bbox):
 
     return img, aug_box
 
-
-def update_box(bbox, rotation_matrix):
-    """
-    Update bounding accordingly to the rotation matrix
-    :param bbox: [[(x1,y1), (x2, y2)]]
-    :param rotation_matrix: 
-    :return: 
-    """
-    # Transform to correct bounding box when performing augmentation
-    rotated_box = []
-    if bbox is not None:
-        for box in bbox:
-            for pts in box:
-                pts = np.asarray(pts).astype('float32')  # Convert to float
-                pts = np.append(pts, [0.], 0)            # 3-D : (x, y, z)
-                pts = np.expand_dims(pts, axis=1)
-
-                # new_box = cv2.transform([pts], rotation_matrix)
-                new_box = np.dot(rotation_matrix, pts).T.flatten().astype(int).tolist()
-                rotated_box.append(tuple(new_box))
-    return [rotated_box]
-
-
-def shear(img, bbox=None):
-    " Affirm Transformation orignal image"
-    x, y, channel = img.shape
-    shear = np.random.randint(4, 6)
-    pts1 = np.array([[5, 5], [20, 5], [5, 20]]).astype('float32')
-
-    pt1 = 5 + shear * np.random.uniform() - shear / 2
-    pt2 = 20 + shear * np.random.uniform() - shear / 2
-
-    pts2 = np.float32([[pt1, 5], [pt2, pt1], [5, pt2]])
-    M = cv2.getAffineTransform(pts1, pts2)
-    result = cv2.warpAffine(img, M, (y, x))
-    rotated_box = update_box(bbox, M)
-
-    return result, rotated_box
+# def update_box(bbox, rotation_matrix):
+#     """
+#     Update bounding accordingly to the rotation matrix
+#     :param bbox: [[(x1,y1), (x2, y2)]]
+#     :param rotation_matrix:
+#     :return:
+#     """
+#     # Transform to correct bounding box when performing augmentation
+#     rotated_box = []
+#     if bbox is not None:
+#         for box in bbox:
+#
+#     return [rotated_box]
 
 
 def augment_brightness_camera_images(image):
@@ -96,8 +72,22 @@ def rotate(img, bbox=None):
     rotated_img = cv2.warpAffine(img, rotation_matrix, (col, row))
 
     # Update bounding box
-    rotated_box = update_box(bbox, rotation_matrix)
-    return rotated_img, rotated_box
+    angle = angle * (np.pi / 180)
+    rotated_box =[]
+    for box in bbox:
+        for pts in box:
+            pts = np.asarray(pts, dtype=np.float)
+            x = pts[0]
+            y = pts[1]
+            axis_x = x - rotation_point[0]
+            axis_y = y - rotation_point[1]
+
+            x = axis_x * math.cos(angle) + axis_y * math.sin(angle)
+            y = (-axis_x) * math.sin(angle) + axis_y * math.cos(angle);
+            x = x + rotation_point[0]
+            y = y + rotation_point[1]
+            rotated_box.append(tuple(np.array([x, y])))
+    return rotated_img, [rotated_box]
 
 
 

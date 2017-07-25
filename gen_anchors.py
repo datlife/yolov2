@@ -52,12 +52,13 @@ def __main__():
     # Extract bounding boxes from training data
     with open(label_path, "r") as f:
         lines = f.readlines()
+        # Update aspect ratio
+        aspect_ratio = [IMG_INPUT / float(img_width), IMG_INPUT / float(img_height)]
+        print(aspect_ratio)
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
-            # Update aspect ratio
-
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
-            box = Box(0, 0, float(w) / img_width, float(h)/ img_height)
+            box = Box(0, 0, float(w) * aspect_ratio[0] / SHRINK_FACTOR, float(h) * aspect_ratio[1] / SHRINK_FACTOR)
             gt_boxes.append(box)
 
     # ############## K-MEAN CLUSTERING ########################
@@ -65,13 +66,8 @@ def __main__():
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))
 
     # print result
-    a = np.array([[an.w, an.h] for an in anchors], dtype=np.float)
-    print(a)
-    a = a * [30., 40.]
-    print(a)
-    # for anchor in anchors:
-    #     print("({}, {})".format(anchor.w,
-    #                             anchor.h))
+    for anchor in anchors:
+        print("({}, {})".format(anchor.w, anchor.h))
 
 
 def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):

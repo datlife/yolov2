@@ -25,12 +25,6 @@ class MobileYolo(object):
         self.n_classes = num_classes
         self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer)
 
-    def loss(self):
-        raise NotImplemented
-
-    def predict(self):
-        raise NotImplemented
-
     def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer):
         """
         Build YOLOv2 Model
@@ -42,6 +36,12 @@ class MobileYolo(object):
         YOLOv2 = Model(inputs=[feature_extractor.input], outputs=[object_detector])
 
         return YOLOv2
+
+    def loss(self):
+        raise NotImplemented
+
+    def predict(self):
+        raise NotImplemented
 
 
 def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer=43):
@@ -112,14 +112,3 @@ def space_to_depth_x4_output_shape(input_shape):
     """
     return (input_shape[0], input_shape[1] // 4, input_shape[2] // 4, 16 * input_shape[3]) if input_shape[1] else \
         (input_shape[0], None, None, 16 * input_shape[3])
-
-# Test case
-if __name__ == "__main__":
-    darknet19 = darknet19(freeze_layers=True)
-    yolov2 = YOLOv2(feature_extractor=darknet19, num_anchors=5, num_classes=31)
-    yolov2.model.summary()
-    model = yolov2.model
-    import keras.backend as K
-
-    model.compile(loss='mse', optimizer='adam', metrics=['acc'])
-    print(K.shape(model.output))

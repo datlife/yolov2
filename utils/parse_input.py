@@ -18,7 +18,7 @@ def load_data(txt_file):
     img_size (width, height, channels)
     :return: 
             X:  list of image_path
-            Y:  list of labels as [x1, x2, y1, y2, label]
+            Y:  list of labels as [xc, xc, w, h, label]
     """
     # Extract bounding boxes from training data
     image_paths = []
