@@ -63,3 +63,7 @@ def darknet19(input_size=None, pretrained_weights=None, freeze_layers=True):
             layer.trainable = False
 
     return feature_extractor
+
+if __name__=='__main__':
+    darknet = darknet19(input_size=(608, 608, 3))
+    print darknet.summary()
