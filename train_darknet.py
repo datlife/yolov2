@@ -92,7 +92,7 @@ def _main_():
                                validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=2, verbose=1)
+                               workers=2, verbose=1, max_q_size=3)
 
     yolov2.model.save_weights('yolov2.weights')
 
