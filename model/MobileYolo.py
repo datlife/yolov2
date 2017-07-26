@@ -1,3 +1,11 @@
+"""
+Implementation of YOLOv2 Architecture on Keras
+
+Few notes:
+   - Its feature extractor is still DarkNet-19 (a VGG-ish CNN)
+   - Its object detector structure is still the same. Instead of using regular CNN, however, I used MobileNet-like CNN
+     in oder to reduce the number of parameters (from 57M --> 26.5M parameters )
+"""
 from keras.layers.merge import concatenate
 from keras.layers import Conv2D
 from keras.layers import Lambda

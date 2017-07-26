@@ -21,35 +21,22 @@ def random_transform(img, bbox):
     if a[1] == 1:
         img = blur(img)
     if a[2] == 1:
-        img = augment_brightness_camera_images(img)
+        img = change_brightness(img)
     # GAN can apply here to create random occlusion and deformation
 
     return img, aug_box
 
-# def update_box(bbox, rotation_matrix):
-#     """
-#     Update bounding accordingly to the rotation matrix
-#     :param bbox: [[(x1,y1), (x2, y2)]]
-#     :param rotation_matrix:
-#     :return:
-#     """
-#     # Transform to correct bounding box when performing augmentation
-#     rotated_box = []
-#     if bbox is not None:
-#         for box in bbox:
-#
-#     return [rotated_box]
 
-
-def augment_brightness_camera_images(image):
-    image1 = cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
-    image1 = np.array(image1, dtype = np.float64)
+def change_brightness(image):
+    image1 = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    image1 = np.array(image1, dtype=np.float64)
     random_bright = .5+np.random.uniform()
-    image1[:,:,2] = image1[:,:,2]*random_bright
-    image1[:,:,2][image1[:,:,2]>255]  = 255
-    image1 = np.array(image1, dtype = np.uint8)
-    image1 = cv2.cvtColor(image1,cv2.COLOR_HSV2RGB)
+    image1[:, :, 2] = image1[:, :, 2]*random_bright
+    image1[:, :, 2][image1[:, :, 2] > 255]  = 255
+    image1 = np.array(image1, dtype=np.uint8)
+    image1 = cv2.cvtColor(image1, cv2.COLOR_HSV2RGB)
     return image1
+
 
 def blur(img):
     r_int = np.random.randint(0, 2)
@@ -64,7 +51,6 @@ def rotate(img, bbox=None):
     :param bbox: 
     :return: 
     """
-
     row, col, channel = img.shape
     angle = np.random.uniform(-20, 20)
     rotation_point = (row / 2, col / 2)
@@ -83,17 +69,11 @@ def rotate(img, bbox=None):
             axis_y = y - rotation_point[1]
 
             x = axis_x * math.cos(angle) + axis_y * math.sin(angle)
-            y = (-axis_x) * math.sin(angle) + axis_y * math.cos(angle);
+            y = (-axis_x) * math.sin(angle) + axis_y * math.cos(angle)
             x = x + rotation_point[0]
             y = y + rotation_point[1]
             rotated_box.append(tuple(np.array([x, y])))
     return rotated_img, [rotated_box]
 
 
-
-def draw_boxes(img, boxes, color=(0, 255, 0), thickness=6):
-    draw_img = np.copy(img)
-    for box in boxes:
-        cv2.rectangle(draw_img, box[0], box[1], color, thickness)
-    return draw_img
 

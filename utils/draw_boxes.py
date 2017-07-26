@@ -1,11 +1,10 @@
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from cfg import *
 
 
 def draw(img, boxes):
     """
-    
+    Drawing Bounding Box on Image
     :param img:   
     :param boxes: 
     :return: 
@@ -16,7 +15,6 @@ def draw(img, boxes):
         p1 = (box.x1, box.y1)
         p2 = (box.x2, box.y2)
         label = '{} {:.2f}%'.format(box.cls, box.score * 100)
-
         draw = ImageDraw.Draw(image)
         # font = ImageFont.truetype(font='./FiraMono-Medium.otf', encoding='ADOB')
         label_size = draw.textsize(label)
@@ -42,6 +40,7 @@ class Box(object):
         self.score = float(score)
 
 
+# Test
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import cv2

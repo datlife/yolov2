@@ -1,11 +1,11 @@
 """
-
+Util that convert text file into (image_paths), (labels)
 """
 import numpy as np
 from utils.box import Box, convert_bbox
 
 
-def load_data(txt_file):
+def parse_txt_to_inputs(txt_file):
     """
     Parse input file into X, Y
     Parameters

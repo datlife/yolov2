@@ -1,44 +1,45 @@
 # coding: utf-8
-
 """
-This script will generate anchors based on your training bounding boxes.
-It will apply k-mean cluster through the boxes in training data to determine size (w, h) for K anchors (in YOLOv2, K = 5)
+This script will generate anchors based on your training bounding boxes. This will help model converge faster.
+
+What it will do:
+----------------
+* Apply k-mean cluster through the boxes in training data to determine
+size (w, h) for K anchors (in YOLOv2, K = 5)
+
+* Display an ANCHORS parameter to screen. Copy this into `cfg.py` to help your network learn faster
+
 
 Requirements
 ------------
-   1. One needs to have a training data in txt format as [img_path, x1, x2, y1, y2, label]
+   1. One needs to have a training data in text format as [img_path, x1, x2, y1, y2, label]
    2. Image size of training data. [default : w= 1280 h =960]
 
 
 Example:
 --------
 
-python gen_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
-python gen_anchors.py -n 5 -p training.txt -w 1280 -h 960
+python generate_anchors.py --num_anchors 5 --label_bath training.txt --img_width 1280 --img_height 960
+python generate_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
-import cv2
+# import cv2
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
 from cfg import *
 
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
+
 parser.add_argument('-n', '--num_anchors',
-                    type=int,   default=5,
-                    help="Number of anchors")
-parser.add_argument('-p',
-                    '--label_path',
-                    type=str, default='data/training.txt',
-                    help="Path to Training txt file")
-parser.add_argument('-width',
-                    '--image_width',
-                    type=int, default=1280,
-                    help="Image Width")
-parser.add_argument('-height',
-                    '--image_height',
-                    type=int, default=960,
-                    help="Image Height")
+                    type=int,   default=5, help="Number of anchors")
+parser.add_argument('-p', '--label_path',
+                    type=str, default='data/training.txt', help="Path to Training txt file")
+
+parser.add_argument('-width', '--image_width',
+                    type=int, default=1280, help="Image Width")
+parser.add_argument('-height', '--image_height',
+                    type=int, default=960, help="Image Height")
 
 
 def __main__():
@@ -155,45 +156,6 @@ def convert_bbox(x1, y1, x2, y2):
     xc = float(x1) + w / 2.
     yc = float(y1) + h / 2.
     return xc, yc, w, h
-
-
-class Box(object):
-    def __init__(self, xc, yc, w, h):
-        self.x = xc
-        self.y = yc
-        self.w = w
-        self.h = h
-
-
-def box_iou(b1, b2):
-    intersect = box_intersection(b1, b2)
-    union = box_union(b1, b2)
-    iou = float(intersect / union)
-    return iou
-
-
-def box_intersection(b1, b2):
-    w = overlap(b1.x, b1.w, b2.x, b2.w)
-    h = overlap(b1.x, b1.h, b2.x, b2.h)
-    if (w < 0) or (h < 0): return 0
-    area = w * h
-    return area
-
-
-def overlap(x1, w1, x2, w2):
-    l1 = x1 - (w1 / 2.)
-    l2 = x2 - (w2 / 2.)
-    r1 = x1 + (w1 / 2.)
-    r2 = x2 + (w2 / 2.)
-    left = l1 if l1 >= l2 else l2
-    right = r1 if r1 <= r2 else r2
-    return right - left
-
-
-def box_union(b1, b2):
-    intersect = box_intersection(b1, b2)
-    union = (b1.w * b1.h) + (b2.w * b2.h) - intersect
-    return union
 
 
 if __name__ == "__main__":

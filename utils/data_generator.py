@@ -1,5 +1,16 @@
 """
-Data Handler for Training Deep Learning Model
+A Threaded Data Generator for YOLOv2
+
+It will generates two things for every batch:
+
+1) Batch of images (in numpy matrices):
+   * Dimension : [bach_size, IMG_INPUT, IMG_INPUT, N_ANCHORS * (N_CLASSES+5)]
+   * Contain preprocessed input (normalized, re-sized) images
+
+2) Batch of ground truth labels       :
+    * Dimension: [batch_size, (IMG_INPUT / SHRINK_FACTOR), (IMG_INPUT / SHRINK_FACTOR), N_ANCHORS * (N_CLASSES+5)]
+    * Each ground truth contain : xc, yc, w, h, to, one_hot_labels
+
 """
 import os
 import cv2
@@ -8,7 +19,7 @@ import threading
 from sklearn.utils import shuffle
 
 from utils.box import Box, convert_bbox
-from utils.image_handler import random_transform, preprocess_img
+from utils.augment_img import random_transform, preprocess_img
 from cfg import *
 
 
@@ -34,6 +45,7 @@ def threadsafe_generator(f):
     def g(*a, **kw):
         return threadsafe_iter(f(*a, **kw))
     return g
+
 
 @threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):

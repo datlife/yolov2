@@ -10,8 +10,8 @@ class Box(object):
 
     def to_opencv_format(self):
         """
-        
-        :return: 
+        Convert bounding box to OpenCV format
+        :return:  [[(x1, y1), (x2, y2)]] (numpy int)
         """
         x1 = int(self.x - self.w/2)
         y1 = int(self.y - self.h/2)

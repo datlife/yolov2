@@ -1,5 +1,5 @@
 """
-Convert LISA csv annotation dataset to txt format as following:
+Convert LISA csv annotation data set to txt format as following:
 
 Text file:
 ---------
@@ -7,12 +7,7 @@ abs_image_path, x1, y1, x2, y2, label
 
 Usage:
 -----
-
 python process_lisa.py -p ../lisa/training
-
-eg:
-python process_lisa.py -p ../lisa/training
-
 
 It will create a text file 'training.txt' for training on YOLOv2
 """
@@ -24,6 +19,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Convert LISA Annotation into text file")
 parser.add_argument('--lisa_path', '-p', type=str, help='path to training/testing lisa dataset')
+
 
 def _main_():
     args = parser.parse_args()
@@ -57,7 +53,6 @@ def load_lisa_data(path=None):
 
     if not os.path.isdir(path):
         raise IOError("Path does not exist")
-    
 
     # Get all .csv file(s) in given path (including sub-directories)
     csv_files = glob.glob(path + "*.csv")
