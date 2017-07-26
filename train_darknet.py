@@ -71,7 +71,13 @@ def _main_():
         layer.trainable = False
 
     # Construct Data Generator
-    train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+    # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+    one_sample = np.tile(x_train[0:4], 8).tolist()
+    one_label  = np.tile(y_train[0:4], [8, 1])
+    print([name.split('/')[-1].split('.')[0] for name in one_sample])
+    print(one_sample[1])
+    train_data_gen = flow_from_list(one_sample, one_label, batch_size=BATCH_SIZE, augment_data=True)
+    val_data_gen = flow_from_list(one_sample, one_label,   batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -90,7 +96,7 @@ def _main_():
     yolov2.model.fit_generator(generator=train_data_gen,
                                steps_per_epoch=len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=100,
+                               validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=2, verbose=1)
@@ -107,7 +113,7 @@ def create_data_generator(x_train, y_train):
     """
     x_train, y_train = shuffle(x_train, y_train)
     train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
-    x_test, y_test = shuffle(x_train, y_train)[0:600]
+    x_test, y_test = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
     val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
     return train_data_gen, val_data_gen
 
