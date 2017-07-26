@@ -16,6 +16,9 @@ Download: [YOLOv2 Keras Weights]()
 - [ ] Train on any custom data set
 - [ ] Use MobileNet as feature extractor (super fast, accuracy ~ VGG-16)
 
+## Dependencies
+conda install -c menpo opencv=2.4.11
+
 ## Examples
 
 * Detect objects in a given image
