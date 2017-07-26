@@ -31,7 +31,6 @@ def custom_loss(y_true, y_pred):
     pred_box_wh = tf.sqrt(pred_box_wh / output_size)
     # adjust confidence
     pred_box_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)
-    # adjust probability @TODO: create hierarchical soft-max tree
     pred_box_prob = y_pred[:, :, :, :, 5:]
 
     y_pred = tf.concat([pred_box_xy, pred_box_wh], 4)
@@ -65,34 +64,33 @@ def custom_loss(y_true, y_pred):
 
     # adjust confidence
     true_box_prob = y_true[:, :, :, :, 5:]
-
     y_true = tf.concat([true_box_xy, true_box_wh], 4)
 
-    # Compute the weights
+    # Coordinate Loss
     weight_coor = tf.concat(4 * [true_box_conf], 4)
     weight_coor = 5.0 * weight_coor
     weight = tf.concat([weight_coor], 4)
-
-    # Calculate probability
-    weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
-    weight_prob = 1.0 * weight_prob
-    pred_probs = (pred_box_conf * pred_box_prob) * weight_prob
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=pred_probs, labels=true_box_prob)
-    probs_loss = tf.reduce_mean(cross_entropy)
-
-    # Confidence loss
-    weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
-    conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
-    conf_loss = tf.reshape(conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 1])
-    conf_loss = tf.reduce_sum(conf_loss, 1)
-    conf_loss = tf.reduce_mean(conf_loss)
-
-    # Finalize the loss
     loss = tf.pow(y_pred - y_true, 2)
     loss = loss * weight
     loss = tf.reshape(loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
     loss = tf.reduce_sum(loss, 1)
     loss = tf.reduce_mean(loss)
+
+    # Object probability Loss
+    weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
+    weight_prob = 1.0 * weight_prob
+    pred_probs = (pred_box_conf * pred_box_prob) * weight_prob
+
+    # @TODO: soft-max hierarchical tree
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=pred_probs, labels=true_box_prob)
+    probs_loss = tf.reduce_mean(cross_entropy)
+
+    # Object Confidence loss
+    weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
+    conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
+    conf_loss = tf.reshape(conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 1])
+    conf_loss = tf.reduce_sum(conf_loss, 1)
+    conf_loss = tf.reduce_mean(conf_loss)
 
     # Total loss
     loss = 0.5 * (loss + conf_loss + probs_loss)
