@@ -1,7 +1,7 @@
 """
 Convert LISA csv annotation data set to txt format as following:
 
-Text file:
+Text file Format:
 ---------
 abs_image_path, x1, y1, x2, y2, label
 
@@ -19,20 +19,22 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Convert LISA Annotation into text file")
 parser.add_argument('--lisa_path', '-p', type=str, help='path to training/testing lisa dataset')
+parser.add_argument('--output_filename', '-o', type=str, default='training.txt', help='Output file name')
+
+args = parser.parse_args()
+lisa_path = args.lisa_path
+out_fname = args.output_filename
 
 
 def _main_():
-    args = parser.parse_args()
-    lisa_path = args.lisa_path    
     # Parse lisa and save into text file
-    save_lisa_to_txt(lisa_path,save_file='./training.txt')
-    print("A text file has been created.")
+    save_lisa_to_txt(lisa_path, save_file=out_fname)
 
 
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     image_paths, labels = load_lisa_data(csv_path)
     df = pd.concat([image_paths, labels], axis=1)
-    np.savetxt("training.txt", df.values, delimiter=',', fmt='%s')
+    np.savetxt(os.path.join(lisa_path, save_file), df.values, delimiter=',', fmt='%s')
     return image_paths, labels
 
 
@@ -76,7 +78,9 @@ def load_lisa_data(path=None):
     Y = pd.concat(Y)
     # Re-arrange order of pandas frame
     Y = Y[['Upper left corner X', 'Upper left corner Y', 'Lower right corner X', 'Lower right corner Y', 'Annotation tag']]
-    print("Done parsing input")
+
+    print("A text file has been created at {}/{}".format(path, out_fname))
+
     return X, Y
 
 if __name__ == "__main__":
