@@ -32,8 +32,8 @@ parser.add_argument('-p', '--path', help="Path to training data set (e.g. /datas
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
 parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=8)
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001)
-parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='./backup')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
+parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='/media/sharedHDD/yolo_model/')
 
 args = parser.parse_args()
 annotation_path = args.path
@@ -47,7 +47,7 @@ K.clear_session()  # Avoid duplicate model
 
 
 def learning_rate_schedule(epochs):
-    if epochs < 90:
+    if epochs < 60:
         return LEARNING_RATE
     if 60 <= epochs < 90:
         return LEARNING_RATE / 10.
@@ -71,13 +71,7 @@ def _main_():
         layer.trainable = False
 
     # Construct Data Generator
-    # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
-    one_sample = np.tile(x_train[0:4], 8).tolist()
-    one_label  = np.tile(y_train[0:4], [8, 1])
-    print([name.split('/')[-1].split('.')[0] for name in one_sample])
-    print(one_sample[1])
-    train_data_gen = flow_from_list(one_sample, one_label, batch_size=BATCH_SIZE, augment_data=True)
-    val_data_gen = flow_from_list(one_sample, one_label,   batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -87,14 +81,13 @@ def _main_():
         yolov2.model.load_weights(WEIGHTS_FILE)
 
     adam = keras.optimizers.Adam(LEARNING_RATE)
+    sgd  = keras.optimizers.SGD(LEARNING_RATE, decay=0.0005, momentum=0.9)
     yolov2.model.compile(optimizer=adam, loss=custom_loss, metrics=[avg_iou, precision])
 
     # Start training here
-    print("Starting training process - Hyper-parameter Settings:\n")
-    print("Learning Rate: {}\nBatch Size: {}\nEPOCHS: {})".format(LEARNING_RATE, BATCH_SIZE, EPOCHS))
-
+    print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=2*len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
                                validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
@@ -132,9 +125,11 @@ def setup_debugger(yolov2):
 if __name__ == "__main__":
     _main_()
 
-    # one_sample = np.tile(x_train[0:4], 8).tolist()
-    # one_label  = np.tile(y_train[0:4], [8, 1])
-    # print([name.split('/')[-1].split('.')[0] for name in one_sample])
-    # print(one_sample[1])
-    # train_data_gen = flow_from_list(one_sample, one_label, batch_size=BATCH_SIZE, augment_data=True)
-    # val_data_gen = flow_from_list(one_sample, one_label,   batch_size=BATCH_SIZE, augment_data=False)
+    # x_train, y_train = shuffle(x_train, y_train)
+    # x_train = np.tile(x_train[0:30], 8).tolist()
+    # y_train  = np.tile(y_train[0:30], [8, 1])
+    # print([name.split('/')[-1].split('.')[0] for name in x_train])
+    # for fname in x_train[0:10]:
+    #     print(fname)
+    # train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
+    # val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)

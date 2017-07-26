@@ -23,6 +23,8 @@ from utils.augment_img import random_transform, preprocess_img
 from cfg import *
 
 
+
+
 class threadsafe_iter:
     """Takes an iterator/generator and makes it thread-safe by
     serializing call to the `next` method of given iterator/generator.
@@ -71,6 +73,10 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     if augment_data is True:
         augment_level = calc_augment_level(y, scaling_factor)  # (less data / class means more augmentation)
 
+    # Get list of classes
+    fl = open(CATEGORIES, 'r')
+    MY_CLASSES = np.array(fl.read().splitlines())
+    fl.close()
     while True:
         x, y = shuffle(x, y)  # Shuffle DATA to avoid over-fitting
         for i in list(range(slices)):
@@ -102,8 +108,9 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 processed_img = preprocess_img(img)
 
                 # convert label to int
-                index_label = np.where(CATEGORIES == label)[0][0]
-                one_hot = np.eye(len(CATEGORIES))[index_label]
+                # @TODO softmax
+                index_label = np.where(MY_CLASSES == label)[0][0]
+                one_hot = np.eye(len(MY_CLASSES))[index_label]
 
                 # convert to relative
                 box = bbox.to_relative_size((float(width), float(height)))

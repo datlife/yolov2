@@ -34,7 +34,7 @@ def _main_():
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     image_paths, labels = load_lisa_data(csv_path)
     df = pd.concat([image_paths, labels], axis=1)
-    np.savetxt(os.path.join(lisa_path, save_file), df.values, delimiter=',', fmt='%s')
+    np.savetxt(save_file, df.values, delimiter=',', fmt='%s')
     return image_paths, labels
 
 

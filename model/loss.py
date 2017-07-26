@@ -32,9 +32,9 @@ def custom_loss(y_true, y_pred):
     # adjust confidence
     pred_box_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)
     # adjust probability @TODO: create hierarchical soft-max tree
-    pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
+    pred_box_prob = y_pred[:, :, :, :, 5:]
 
-    y_pred = tf.concat([pred_box_xy, pred_box_wh, pred_box_conf, pred_box_prob], 4)
+    y_pred = tf.concat([pred_box_xy, pred_box_wh], 4)
 
     # Adjust ground truth
     center_xy = y_true[:, :, :, :, 0:2]
@@ -66,24 +66,36 @@ def custom_loss(y_true, y_pred):
     # adjust confidence
     true_box_prob = y_true[:, :, :, :, 5:]
 
-    y_true = tf.concat([true_box_xy, true_box_wh, true_box_conf, true_box_prob], 4)
+    y_true = tf.concat([true_box_xy, true_box_wh], 4)
 
     # Compute the weights
     weight_coor = tf.concat(4 * [true_box_conf], 4)
     weight_coor = 5.0 * weight_coor
-    weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
+    weight = tf.concat([weight_coor], 4)
+
+    # Calculate probability
     weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
     weight_prob = 1.0 * weight_prob
+    pred_probs = (pred_box_conf * pred_box_prob) * weight_prob
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=pred_probs, labels=true_box_prob)
+    probs_loss = tf.reduce_mean(cross_entropy)
 
-    weight = tf.concat([weight_coor, weight_conf, weight_prob], 4)
+    # Confidence loss
+    weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
+    conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
+    conf_loss = tf.reshape(conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 1])
+    conf_loss = tf.reduce_sum(conf_loss, 1)
+    conf_loss = tf.reduce_mean(conf_loss)
 
     # Finalize the loss
     loss = tf.pow(y_pred - y_true, 2)
     loss = loss * weight
-    loss = tf.reshape(loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * (4 + 1 + N_CLASSES)])
+    loss = tf.reshape(loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
     loss = tf.reduce_sum(loss, 1)
-    loss = .5 * tf.reduce_mean(loss)
+    loss = tf.reduce_mean(loss)
 
+    # Total loss
+    loss = 0.5 * (loss + conf_loss + probs_loss)
     return loss
 
 
@@ -108,6 +120,7 @@ def _create_offset_map(output_shape):
     c_xy = K.cast(c_xy, tf.float32)
 
     return c_xy
+
 
 
 def avg_iou(y_true, y_pred):
@@ -149,47 +162,6 @@ def avg_iou(y_true, y_pred):
 
     iou = tf.truediv(intersect_area, true_box_area + pred_box_area - intersect_area)
     return tf.reduce_sum(iou) / tf.to_float(gt_shape[0])
-
-
-def recall(y_true, y_pred):
-    pred_shape = K.shape(y_pred)[1:3]
-    gt_shape = K.shape(y_true)  # shape of ground truth value
-    GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
-    GRID_W = tf.cast(pred_shape[1], tf.int32)
-
-    output_size = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
-    y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
-    y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
-
-    c_xy = _create_offset_map(K.shape(y_pred))
-
-    pred_box_xy = (tf.sigmoid(y_pred[..., :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
-    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
-
-    # Adjust ground truth
-    center_xy = y_true[:, :, :, :, 0:2]
-    true_box_xy = center_xy
-    true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
-
-    # adjust confidence
-    pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
-    pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
-    pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
-
-    true_tem_wh = tf.pow(true_box_wh, 2) * output_size
-    true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
-    true_box_ul = true_box_xy - 0.5 * true_tem_wh
-    true_box_bd = true_box_xy + 0.5 * true_tem_wh
-
-    intersect_ul = tf.maximum(pred_box_ul, true_box_ul)
-    intersect_br = tf.minimum(pred_box_bd, true_box_bd)
-    intersect_wh = intersect_br - intersect_ul
-    intersect_wh = tf.maximum(intersect_wh, 0.0)
-    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
-
-    recall_value = tf.truediv(intersect_area, true_box_area)
-    return tf.reduce_sum(recall_value)
 
 
 def precision(y_true, y_pred):
