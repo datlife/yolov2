@@ -29,7 +29,7 @@ class SoftMaxTree(object):
         raise NotImplemented
 
     def get_hierachy_probability(self, key):
-        raise NotImplementeds
+        raise NotImplemented
 
 if __name__ == "__main__":
     tree = []

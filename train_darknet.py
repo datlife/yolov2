@@ -63,9 +63,9 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    darknet    = darknet19(input_size=(608, 608, 3), pretrained_weights='../dataset/yolo-coco.h5')
+    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), pretrained_weights='yolo-coco.h5')
     yolov2     = MobileYolo(feature_extractor=darknet, num_anchors=5, num_classes=N_CLASSES, fine_grain_layer='leaky_re_lu_13')
-    # yolov2.model.summary()
+    yolov2.model.summary()
 
     for layer in darknet.layers:
         layer.trainable = False
@@ -96,12 +96,12 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=2*len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=50, # 2*len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=int(len(x_train)/BATCH_SIZE),
+                               validation_steps=10, # int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=2, verbose=1, max_q_size=3)
+                               workers=2, verbose=1)
 
     yolov2.model.save_weights('yolov2.weights')
 

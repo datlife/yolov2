@@ -1,12 +1,11 @@
 from keras.models import Model
-from keras.layers import Input, ZeroPadding2D, merge
+from keras.layers import Input, ZeroPadding2D
 from keras.layers.merge import concatenate
 from keras.layers.core import Dense, Dropout, Activation
-from keras.layers.convolutional import Conv2D, Convolution2D
-from keras.layers.pooling import AveragePooling2D, GlobalAveragePooling2D, MaxPooling2D
+from keras.layers.convolutional import Conv2D
+from keras.layers.pooling import AveragePooling2D, MaxPooling2D,  GlobalAveragePooling2D
 from keras.layers.normalization import BatchNormalization
 from keras.engine import Layer, InputSpec
-
 try:
     from keras import initializations
 except ImportError:
@@ -14,8 +13,8 @@ except ImportError:
 import keras.backend as K
 
 
-def DenseNet(nb_dense_block=4, growth_rate=48, nb_filter=96, reduction=0.0, dropout_rate=0.0, weight_decay=1e-4, classes=1000, weights_path=None):
-    '''Instantiate the DenseNet 161 architecture,
+def DenseNet(nb_dense_block=4, growth_rate=32, freeze_layers=True, nb_filter=64, reduction=0.0, dropout_rate=0.0, weight_decay=1e-4, classes=1000, weights_path=None):
+    '''Instantiate the DenseNet 121 architecture,
         # Arguments
             nb_dense_block: number of dense blocks to add to end
             growth_rate: number of filters to add per dense block
@@ -35,12 +34,16 @@ def DenseNet(nb_dense_block=4, growth_rate=48, nb_filter=96, reduction=0.0, drop
 
     # Handle Dimension Ordering for different backends
     global concat_axis
-    concat_axis = 3
-    img_input = Input(shape=(None, None, 3), name='data')
+    if K.image_dim_ordering() == 'tf':
+      concat_axis = 3
+      img_input = Input(shape=(None, None, 3), name='data')
+    else:
+      concat_axis = 1
+      img_input = Input(shape=(3, 224, 224), name='data')
 
     # From architecture for ImageNet (Table 1 in the paper)
-    nb_filter = 96
-    nb_layers = [6, 12, 36, 24] # For DenseNet-161
+    nb_filter = 64
+    nb_layers = [6, 12, 24, 16] # For DenseNet-121
 
     # Initial convolution
     x = ZeroPadding2D((3, 3), name='conv1_zeropadding')(img_input)
@@ -66,18 +69,23 @@ def DenseNet(nb_dense_block=4, growth_rate=48, nb_filter=96, reduction=0.0, drop
     x = BatchNormalization(epsilon=eps, axis=concat_axis, name='conv'+str(final_stage)+'_blk_bn')(x)
     x = Scale(axis=concat_axis, name='conv'+str(final_stage)+'_blk_scale')(x)
     x = Activation('relu', name='relu'+str(final_stage)+'_blk')(x)
-
-    x = GlobalAveragePooling2D(name='pool'+str(final_stage))(x)
-    x = Dense(classes, name='fc6')(x)
-    x = Activation('softmax', name='prob')(x)
-
-    model = Model(img_input, x, name='densenet')
-
-    if weights_path is not None:
-      model.load_weights(weights_path)
+    # x = GlobalAveragePooling2D(name='pool'+str(final_stage))(x)
+    #
+    # x = Dense(classes, name='fc6')(x)
+    # x = Activation('softmax', name='prob')(x)
+    #
+    # model = Model(img_input, x, name='densenet')
 
     # Only get feature extractor
-    model = Model(img_input, model.layers[-4].output, name='feature_extractor')
+    model = Model(img_input, x, name='feature_extractor')
+
+    if weights_path is not None:
+      model.load_weights(weights_path, by_name=True)
+
+    if freeze_layers:
+        for layer in model.layers:
+            layer.trainable = False
+
     return model
 
 
@@ -110,6 +118,7 @@ def conv_block(x, stage, branch, nb_filter, dropout_rate=None, weight_decay=1e-4
     x = Activation('relu', name=relu_name_base+'_x2')(x)
     x = ZeroPadding2D((1, 1), name=conv_name_base+'_x2_zeropadding')(x)
     x = Conv2D(nb_filter, (3, 3), name=conv_name_base+'_x2', use_bias=False)(x)
+
     if dropout_rate:
         x = Dropout(dropout_rate)(x)
 
@@ -156,6 +165,7 @@ def dense_block(x, stage, nb_layers, nb_filter, growth_rate, dropout_rate=None, 
             weight_decay: weight decay factor
             grow_nb_filters: flag to decide to allow number of filters to grow
     '''
+
     eps = 1.1e-5
     concat_feat = x
 
@@ -172,13 +182,13 @@ def dense_block(x, stage, nb_layers, nb_filter, growth_rate, dropout_rate=None, 
 class Scale(Layer):
     '''Custom Layer for DenseNet used for BatchNormalization.
 
-    Learns a set of weights and use_biases used for scaling the input data.
+    Learns a set of weights and biases used for scaling the input data.
     the output consists simply in an element-wise multiplication of the input
     and a sum of a set of constants:
 
         out = in * gamma + beta,
 
-    where 'gamma' and 'beta' are the weights and use_biases larned.
+    where 'gamma' and 'beta' are the weights and biases larned.
 
     # Arguments
         axis: integer, axis along which to normalize in mode 0. For instance,
@@ -236,6 +246,7 @@ class Scale(Layer):
         base_config = super(Scale, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
+
 if __name__ == "__main__":
-    densenet = DenseNet(reduction=0.5, classes=1000, weights_path='densenet161_weights_tf.h5')
+    densenet = DenseNet(reduction=0.5, classes=1000, weights_path='../densenet121_weights_tf.h5')
     print(densenet.summary())

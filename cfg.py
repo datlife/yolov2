@@ -5,7 +5,7 @@ N_CLASSES     = 56     # Number of classes
 CATEGORIES    = 'lisa.names'
 
 # Optional
-IMG_INPUT     = 672    # DarkNet Feature Extractor uses (608, 608) image size
+IMG_INPUT     = 608    # DarkNet Feature Extractor uses (608, 608) image size
 SHRINK_FACTOR = 32     # How much image dimension has been reduced. **For DarkNet19 (max-pool 5 times) ** 2^5 = 32
 AUGMENT_LEVEL = 15     # The higher, the more data is augmented
 
@@ -17,8 +17,6 @@ ANCHORS       = np.array(((1.67509256517, 2.46035742496),
                           (0.623830460077, 0.919391367777),
                           (0.45064008354, 0.678599422442),
                           (0.845506524725, 1.22186355311)))
-print(ANCHORS)
-anchors = ANCHORS / np.array([608/32., 608/32.])
-ANCHORS = anchors * np.array([672./32, 672./32])
-print ANCHORS
 
+# anchors = ANCHORS / np.array([608/32., 608/32.])
+# ANCHORS = anchors * np.array([672./32, 672./32])
