@@ -70,6 +70,7 @@ def _main_():
 
     # Construct Data Generator
     train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
@@ -84,9 +85,9 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=3*len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=int(len(x_train)/BATCH_SIZE),
+                               validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=2, verbose=1)

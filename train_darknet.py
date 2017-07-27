@@ -71,16 +71,7 @@ def _main_():
         layer.trainable = False
 
     # Construct Data Generator
-    # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
-
-    x_train, y_train = shuffle(x_train, y_train)
-    x_train = np.tile(x_train[0:4], 8).tolist()
-    y_train  = np.tile(y_train[0:4], [8, 1])
-    # print([name.split('/')[-1].split('.')[0] for name in x_train])
-    for fname in x_train[0:10]:
-        print(fname)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
-    val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -96,12 +87,12 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=50, # 2*len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=10, # int(len(x_train)*0.2/BATCH_SIZE),
+                               validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=2, verbose=1)
+                               workers=3, verbose=1)
 
     yolov2.model.save_weights('yolov2.weights')
 
@@ -114,7 +105,7 @@ def create_data_generator(x_train, y_train):
     :return:
     """
     x_train, y_train = shuffle(x_train, y_train)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=False)
     x_test, y_test = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
     val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
     return train_data_gen, val_data_gen

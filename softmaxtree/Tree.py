@@ -22,7 +22,7 @@ class Node(object):
 
     def __str__(self):
         str = ""
-        str = "%s - %s | n_children :%s\n " % (self.id, self.name, len(self.children))
+        str = "%s - %s \n " % (self.id, self.name)
         for child in self.children:
             for i in range(0, self.height, 1):
                 str += "\t"
@@ -47,7 +47,6 @@ class SoftMaxTree(object):
             for idx, line in enumerate(lines[1:]):
                 name, parent_id = ["".join(s.split()) for s in line.split(',')]  # strip all whitespaces
                 height   = self.tree_dict[int(parent_id)].height + 1
-
                 # Create new node and add to graph dictionary
                 new_node = Node(idx, name, self.tree_dict[int(parent_id)], height)
                 self.tree_dict[idx] = new_node                     # Add new node into dictionary
@@ -58,8 +57,8 @@ class SoftMaxTree(object):
             fl.close()
 
     def encode_label(self, index):
-        # label = np.eye(len(self.tree_dict) - 1)[index]
-        # label[self.tree_dict]
+        label = np.eye(len(self.tree_dict) - 1)[index]
+        label[self.tree_dict]
         raise NotImplemented
 
     def get_hierachy_probability(self, key):
