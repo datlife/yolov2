@@ -1,0 +1,68 @@
+TrafficSign,  root
+
+WarningSign, -1
+curveLeft,   0
+curveRight,  0
+dip,         0
+keepRight,   0
+laneEnds,    0
+merge,       0
+pedestrianCrossing, 0
+rightLaneMustTurn,  0
+slow,               0
+thruMergeLeft,      0
+thruMergeRight,     0
+thruTrafficMergeLeft,0
+turnLeft,           0
+turnRight,          0
+yield,              0
+yieldAhead,         0
+zoneAhead25,        0
+zoneAhead45,        0
+yieldToPedestrian,  0
+
+ProhibitSign, -1
+doNotEnter,        20
+doNotPass,        20
+noLeftAndUTurn,   20
+noLeftTurn,       20
+noParking,        20
+noRightTurn,      20
+noUTurn,          20
+
+InfoSign,     -1
+addedLane,          28
+bicyclesMayUseFullLane,28
+school,             28
+intersection,       28
+intersectionLaneControl,28
+leftAndUTurnControl,28
+rampSpeedAdvisory20,28
+rampSpeedAdvisory35,28
+rampSpeedAdvisory40,28
+rampSpeedAdvisory45,28
+rampSpeedAdvisory50,28
+rampSpeedAdvisoryUrdbl,28
+roundabout,         28
+speedBumpsAhead,    28
+signalAhead,        28
+
+SpeedSign,    -1
+speedLimit15,       44
+speedLimit25,       44
+speedLimit30,       44
+speedLimit35,       44
+speedLimit40,       44
+speedLimit45,       44
+speedLimit50,       44
+speedLimit55,       44
+speedLimit60,       44
+speedLimit65,       44
+speedLimitUrdbl,    44
+schoolSpeedLimit25, 44
+truckSpeedLimit55,  44
+
+StopSign,     -1
+stop,               58
+stopAhead,          58
+
