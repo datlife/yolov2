@@ -10,7 +10,7 @@ def draw(img, boxes):
     :return: 
     """
     image = Image.fromarray(np.floor(img).astype('uint8'))
-    thickness = (image.size[0] + image.size[1]) // 300
+    thickness = (image.size[0] + image.size[1]) // 400
     for box in boxes:
         p1 = (box.x1, box.y1)
         p2 = (box.x2, box.y2)
@@ -23,8 +23,8 @@ def draw(img, boxes):
         for i in range(thickness):
             draw.rectangle([p1[0] + i, p1[1] + i, p2[0] - i, p2[1] - i], outline=tuple(color))
 
-        draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=tuple(color))
-        draw.text(tuple(text_origin), label, fill=(0, 0, 0), label_size=2)
+        # draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=tuple(color))
+        # draw.text(tuple(text_origin), label, fill=(0, 0, 0), label_size=2)
 
         del draw
     return image

@@ -75,13 +75,11 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     reshaped = Lambda(space_to_depth_x2,
                       space_to_depth_x2_output_shape,
                       name='space_to_depth')(res_layer)
-
     x = concatenate([reshaped, x])
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
 
-    detector = Conv2D(filters=(num_anchors * (num_classes + 5)),
-                      kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(x)
+    detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(x)
 
     return detector
 

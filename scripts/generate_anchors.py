@@ -24,6 +24,11 @@ python generate_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
 # import cv2
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'utils'))
+
+from utils.box import Box, box_iou
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
 from cfg import *
