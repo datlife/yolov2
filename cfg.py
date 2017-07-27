@@ -1,4 +1,5 @@
 import numpy as np
+from softmaxtree.Tree import SoftMaxTree
 
 N_ANCHORS     = 5      # Number of ANCHORS (in YOLO9000 paper, 5 was chosen for optimal speed/performance)
 N_CLASSES     = 56     # Number of classes
@@ -17,8 +18,5 @@ ANCHORS       = np.array(((1.67509256517, 2.46035742496),
                           (0.623830460077, 0.919391367777),
                           (0.45064008354, 0.678599422442),
                           (0.845506524725, 1.22186355311)))
-print(ANCHORS)
-anchors = ANCHORS / np.array([608/32., 608/32.])
-ANCHORS = anchors * np.array([672./32, 672./32])
-print ANCHORS
 
+hier_tree = SoftMaxTree(tree_file='softmaxtree/lisa.tree')
