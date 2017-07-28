@@ -110,7 +110,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 # convert label to int
                 # @TODO softmax
                 index_label = np.where(MY_CLASSES == label)[0][0]
-                one_hot = np.eye(len(MY_CLASSES))[index_label]
+                one_hot = HIER_TREE.encode_label(index=index_label)
 
                 # convert to relative
                 box = bbox.to_relative_size((float(width), float(height)))
@@ -154,12 +154,12 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
                 # print("Grid W {} || GRID_H {}".format(grid_w, grid_h))
                 for b in range(batch_size):
-                    # Find the grid cell whe604re the centroid locate
+                    # Find the grid cell where the centroid of ground truth locates
                     center_x = labels[b][0] * grid_w
                     center_y = labels[b][1] * grid_h
                     r = int(np.floor(center_x))
                     c = int(np.floor(center_y))
-
+                    # Imagine a 3-D output feature map which there are only one cell contains the ground truth
                     if r < grid_w and c < grid_h:
                         y_batch[b, c, r, :, 0:4] = N_ANCHORS * [labels[b][..., :4]]
                         y_batch[b, c, r, :, 4]   = N_ANCHORS * [1.0]

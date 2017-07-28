@@ -3,9 +3,8 @@ Implementation of Hierarchical Soft-Max Tree
 
 Input:
 -----
-lisa.names
+lisa.tree
 """
-import re
 import numpy as np
 # Show a structure of a tree
 # Each node has the following [name, parent] - index is inferred from the order of this list
@@ -49,22 +48,29 @@ class SoftMaxTree(object):
                 height   = self.tree_dict[int(parent_id)].height + 1
                 # Create new node and add to graph dictionary
                 new_node = Node(idx, name, self.tree_dict[int(parent_id)], height)
-                self.tree_dict[idx] = new_node                     # Add new node into dictionary
-                self.tree_dict[int(parent_id)].children.append(new_node)    # Update Children
+                self.tree_dict[idx] = new_node                            # Add a new node into dictionary
+                self.tree_dict[int(parent_id)].children.append(new_node)  # Update Children
         except Exception as e:
             print("Error", e)
         finally:
             fl.close()
 
     def encode_label(self, index):
-        label = np.eye(len(self.tree_dict) - 1)[index]
-        label[self.tree_dict]
-        raise NotImplemented
+        encoded_label = np.eye(len(self.tree_dict) - 1)[index]
+
+        # Enable parent node
+        parent_id = self.tree_dict[index].parent.id
+        encoded_label[parent_id] = 1.0
+        return encoded_label
 
     def get_hierachy_probability(self, key):
         raise NotImplemented
 
 
+# Test
 if __name__ == "__main__":
-    tree = SoftMaxTree(tree_file='lisa.tree')
+    tree = SoftMaxTree(tree_file='../lisa.tree2')
     print(tree.tree_dict[-1])
+
+    curve_left = tree.encode_label(index=59)
+    print(curve_left)
