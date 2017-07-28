@@ -6,6 +6,8 @@ Input:
 lisa.tree
 """
 import numpy as np
+import tensorflow as tf
+import keras.backend as K
 # Show a structure of a tree
 # Each node has the following [name, parent] - index is inferred from the order of this list
 
@@ -13,11 +15,11 @@ import numpy as np
 class Node(object):
 
     def __init__(self, id, node_name, parent, height=0):
-        self.id = id
-        self.name = node_name
-        self.parent = parent
+        self.id       = id
+        self.name     = node_name
+        self.parent   = parent
         self.children = []
-        self.height = height
+        self.height   = height
 
     def __str__(self):
         str = ""
@@ -46,6 +48,7 @@ class SoftMaxTree(object):
             for idx, line in enumerate(lines[1:]):
                 name, parent_id = ["".join(s.split()) for s in line.split(',')]  # strip all whitespaces
                 height   = self.tree_dict[int(parent_id)].height + 1
+
                 # Create new node and add to graph dictionary
                 new_node = Node(idx, name, self.tree_dict[int(parent_id)], height)
                 self.tree_dict[idx] = new_node                            # Add a new node into dictionary
@@ -56,6 +59,21 @@ class SoftMaxTree(object):
             fl.close()
 
     def encode_label(self, index):
+        '''
+        Create a encoded binary vector for a class
+            Example: SpeedLimit45 is a subset of SpeedLimit, which is a subset of Traffic Sign
+
+            TraffiSign       SpeedLimit    Speed45
+        [0. 0. 1. 0. 0. 0. ... 1...... 0. ...1... 0. ...]
+
+        args
+        ----
+           index : an integer
+
+        return : an binary_encoded label vector
+        ------
+
+        '''
         encoded_label = np.eye(len(self.tree_dict) - 1)[index]
 
         # Enable parent node
@@ -63,14 +81,32 @@ class SoftMaxTree(object):
         encoded_label[parent_id] = 1.0
         return encoded_label
 
-    def get_hierachy_probability(self, key):
-        raise NotImplemented
+    def calculate_softmax(self, logits, labels):
+        """
+        Update Probabilities of each labels accordingly to Hierarchical Structure
+        :param logits:
+        :param labels:
+        :return:
+        """
+        probs_loss = 0.0
+        idx = -1   # root id
+        while len(self.tree_dict[idx].children) is not 0:   # traverse until reaching the leaf
+
+            # Update probability : Children probability = Prob(object) * Prob(its parent)
+            for children in self.tree_dict[idx].children:
+                node_id = self.tree_dict[children].id
+                logits[..., node_id] = logits[..., node_id] * logits[..., idx]
+
+            # Calculate probability of all its children
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=labels[..., 0:4],
+                                                                    logits=logits[..., 0:4])
+            probs_loss += tf.reduce_mean(cross_entropy)
 
 
 # Test
 if __name__ == "__main__":
-    tree = SoftMaxTree(tree_file='../lisa.tree2')
+    tree = SoftMaxTree(tree_file='../lisa.tree')
     print(tree.tree_dict[-1])
 
-    curve_left = tree.encode_label(index=59)
-    print(curve_left)
+    stop = tree.encode_label(index=59)  # 59 = stop in lisa.categories - 0-based array
+    print(stop)

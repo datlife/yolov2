@@ -108,6 +108,7 @@ def custom_loss(y_true, y_pred):
     weight_prob = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
     pred_probs = (pred_conf * pred_prob) * weight_prob    # Object probability = Objectiveness * IoU * Clf_probs
     # @TODO: soft-max hierarchical tree
+    # cross_entropy = HIER_TREE.calculate_softmax(logits=pred_probs, labels=true_box_prob)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=pred_probs, labels=true_box_prob)
     probs_loss = tf.reduce_mean(cross_entropy)
 

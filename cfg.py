@@ -3,7 +3,7 @@ from softmaxtree.Tree import SoftMaxTree
 
 N_ANCHORS     = 5      # Number of ANCHORS (in YOLO9000 paper, 5 was chosen for optimal speed/performance)
 N_CLASSES     = 56     # Number of classes
-CATEGORIES    = 'lisa.categories'
+CATEGORIES    = 'lisa.names'
 HIER_TREE     = SoftMaxTree(tree_file='lisa.tree')  # Hierarchical Soft-max Implementation
 
 # Optional
@@ -20,3 +20,8 @@ ANCHORS       = np.array(((1.67509256517, 2.46035742496),
                           (0.45064008354, 0.678599422442),
                           (0.845506524725, 1.22186355311)))
 
+from utils.parse_txt_to_inputs import parse_txt_to_inputs    # Data handler for LISA dataset
+
+x_train, y_train = parse_txt_to_inputs('training_extension.txt')
+labels           = np.unique(y_train[:,1])
+print(labels)

@@ -121,11 +121,13 @@ class MobileYolo(object):
         scores  = K.gather(scores, nms_index)
         classes = K.gather(classes, nms_index)
 
-        with tf.Session() as sess:
-            tf.global_variables_initializer().run()
-            boxes_prediction = boxes.eval()
-            scores_prediction = scores.eval()
-            classes_prediction = classes.eval()
+        # tf.global_variables_initializer().run()
+        # new_ops = tf.initialize_variables([boxes, scores, classes])
+        init = tf.local_variables_initializer()
+        K.get_session().run(init)
+        boxes_prediction = boxes.eval()
+        scores_prediction = scores.eval()
+        classes_prediction = classes.eval()
 
         return boxes_prediction, scores_prediction, classes_prediction
 
