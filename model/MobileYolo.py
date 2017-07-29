@@ -45,7 +45,7 @@ class MobileYolo(object):
 
         return YOLOv2
 
-    def predict(self, img, iou_threshold=0.5, score_threshold=0.4):
+    def predict(self, img, iou_threshold=0.5, score_threshold=0.4, mode=0):
         """
         Perform a prediction with non-max suppression
         :param img:
@@ -60,7 +60,7 @@ class MobileYolo(object):
         prediction = self.model.predict(input_img)
 
         pred_shape = np.shape(prediction)
-        prediction = np.reshape(prediction, [-1, pred_shape[1], pred_shape[2], 5, N_CLASSES+5])
+        prediction = np.reshape(prediction, [-1, pred_shape[1], pred_shape[2], N_ANCHORS, N_CLASSES+5])
 
         GRID_H, GRID_W = prediction.shape[1:3]
 
@@ -80,7 +80,7 @@ class MobileYolo(object):
         c_xy = tf.to_float(c_xy)
 
         # resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
-        anchors_tensor = tf.to_float(K.reshape(K.variable(ANCHORS), [1, 1, 1, 5, 2]))
+        anchors_tensor = tf.to_float(K.reshape(K.variable(ANCHORS), [1, 1, 1, N_ANCHORS, 2]))
         netout_size = tf.to_float(K.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]))
 
         box_xy          = K.sigmoid(prediction[..., :2])
@@ -98,7 +98,8 @@ class MobileYolo(object):
         boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
 
         # @TODO different level of soft-max
-        box_scores = box_confidence * box_class_probs
+        # box_scores = box_confidence * box_class_probs
+        box_scores = box_confidence
         box_classes = K.argmax(box_scores, -1)
         box_class_scores = K.max(box_scores, -1)
         prediction_mask = (box_class_scores >= score_threshold)
@@ -155,7 +156,7 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
 
-    res_layer = conv_block(fine_grained, 64, (1, 1))
+    res_layer = conv_block(fine_grained, 512, (1, 1))
     reshaped = Lambda(space_to_depth_x2,
                       space_to_depth_x2_output_shape,
                       name='space_to_depth')(res_layer)

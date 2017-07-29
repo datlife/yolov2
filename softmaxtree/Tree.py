@@ -81,32 +81,39 @@ class SoftMaxTree(object):
         encoded_label[parent_id] = 1.0
         return encoded_label
 
-    def calculate_softmax(self, logits, labels):
+    def calculate_softmax(self, idx, logits, labels):
         """
         Update Probabilities of each labels accordingly to Hierarchical Structure
+        :param idx:   default = -1 / starting from root of soft-max tree
         :param logits:
         :param labels:
         :return:
         """
-        probs_loss = 0.0
-        idx = -1   # root id
-        while len(self.tree_dict[idx].children) is not 0:   # traverse until reaching the leaf
+        loss = 0.0
+        if self.tree_dict[idx].children:   # traverse until reaching the leaf
 
+            first_child = self.tree_dict[idx].children[0].id
             # Update probability : Children probability = Prob(object) * Prob(its parent)
-            for children in self.tree_dict[idx].children:
-                node_id = self.tree_dict[children].id
-                logits[..., node_id] = logits[..., node_id] * logits[..., idx]
+            # print(self.tree_dict[idx].name, idx, first_child, len(self.tree_dict[idx].children))
+            # if idx == -1:  # root
+            #     children_pred = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
+            # else:
+            #     children_pred = logits[..., first_child:first_child + len(self.tree_dict[idx].children)] * logits[..., idx:idx+1]
+            children_pred = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
+            children_gt   = labels[...,  first_child:first_child + len(self.tree_dict[idx].children)]
+            # Calculate soft-max on current node's children
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=children_gt, logits=children_pred)
+            loss = tf.reduce_mean(cross_entropy)
 
-            # Calculate probability of all its children
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=labels[..., 0:4],
-                                                                    logits=logits[..., 0:4])
-            probs_loss += tf.reduce_mean(cross_entropy)
+            # Calculate loss of each children
+            for children in self.tree_dict[idx].children:
+                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels)
+                loss += sub_loss
+        return loss
 
 
 # Test
 if __name__ == "__main__":
     tree = SoftMaxTree(tree_file='../lisa.tree')
-    print(tree.tree_dict[-1])
-
-    stop = tree.encode_label(index=5)  # 59 = stop in lisa.categories - 0-based array
-    print(stop)
+    for children in tree.tree_dict[-1].children:
+        print(children.id)

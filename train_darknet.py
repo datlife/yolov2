@@ -63,8 +63,8 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), pretrained_weights='yolo-coco.h5')
-    yolov2     = MobileYolo(feature_extractor=darknet, num_anchors=5, num_classes=N_CLASSES, fine_grain_layer='leaky_re_lu_13')
+    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), pretrained_weights='./weights/yolo-coco.h5')
+    yolov2     = MobileYolo(feature_extractor=darknet, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer='leaky_re_lu_13')
     yolov2.model.summary()
 
     for layer in darknet.layers:
@@ -82,7 +82,7 @@ def _main_():
 
     adam = keras.optimizers.Adam(LEARNING_RATE)
     sgd  = keras.optimizers.SGD(LEARNING_RATE, decay=0.0005, momentum=0.9)
-    yolov2.model.compile(optimizer=adam, loss=custom_loss, metrics=[avg_iou, precision])
+    yolov2.model.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
     print("Starting training process\n")
@@ -90,7 +90,7 @@ def _main_():
                                steps_per_epoch=len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
                                validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
-                               epochs=EPOCHS, initial_epoch=0,
+                               epochs=30, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=3, verbose=1)
 
@@ -105,7 +105,7 @@ def create_data_generator(x_train, y_train):
     :return:
     """
     x_train, y_train = shuffle(x_train, y_train)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
     x_test, y_test = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
     val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
     return train_data_gen, val_data_gen

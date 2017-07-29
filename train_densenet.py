@@ -22,7 +22,6 @@ from sklearn.utils import shuffle
 from utils.parse_txt_to_inputs import parse_txt_to_inputs    # Data handler for LISA dataset
 from utils.data_generator import flow_from_list
 
-# from model.darknet19 import darknet19
 from model.densenet import DenseNet
 from model.MobileYolo import MobileYolo
 from model.loss import custom_loss, avg_iou, precision
@@ -89,15 +88,15 @@ def _main_():
 
     adam = keras.optimizers.Adam(LEARNING_RATE)
     sgd  = keras.optimizers.SGD(LEARNING_RATE, decay=0.0005, momentum=0.9)
-    yolov2.model.compile(optimizer=adam, loss=custom_loss, metrics=[avg_iou, precision])
+    yolov2.model.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=3*len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=30,
                                validation_data=val_data_gen,
-                               validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
-                               epochs=EPOCHS, initial_epoch=0,
+                               validation_steps=5,
+                               epochs=20, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=2, verbose=1)
 
