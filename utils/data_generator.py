@@ -23,8 +23,6 @@ from utils.augment_img import random_transform, preprocess_img
 from cfg import *
 
 
-
-
 class threadsafe_iter:
     """Takes an iterator/generator and makes it thread-safe by
     serializing call to the `next` method of given iterator/generator.
@@ -52,7 +50,7 @@ def threadsafe_generator(f):
 @threadsafe_generator
 def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     """
-    A ImageGenerator from image paths and return (images, labels) by batch_size
+    An ImageGenerator for Densely YOLO
 
     Parameters
     ---------
@@ -65,7 +63,6 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
     Return
     ------
-    :return: 
         generate (images, labels) in batch_size
     """
     # @TODO: thread-safe generator (to allow nb_workers > 1)
@@ -75,7 +72,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
     # Get list of classes
     fl = open(CATEGORIES, 'r')
-    MY_CLASSES = np.array(fl.read().splitlines())
+    CLASSES = np.array(fl.read().splitlines())
     fl.close()
     while True:
         x, y = shuffle(x, y)  # Shuffle DATA to avoid over-fitting
@@ -109,7 +106,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
 
                 # convert label to int
                 # @TODO softmax
-                index_label = np.where(MY_CLASSES == label)[0][0]
+                index_label = np.where(CLASSES == label)[0][0]
                 one_hot = HIER_TREE.encode_label(index=index_label)
 
                 # convert to relative
@@ -165,7 +162,8 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                         y_batch[b, c, r, :, 4]   = N_ANCHORS * [1.0]
                         y_batch[b, c, r, :, 5:]  = N_ANCHORS * [labels[b][..., 5:]]
 #                         print(b, c, r)
-                yield X[z * batch_size:(z * batch_size) + batch_size], y_batch.reshape([batch_size, int(grid_h), int(grid_w), N_ANCHORS*(N_CLASSES + 5)])
+                yield X[z * batch_size:(z * batch_size) + batch_size], \
+                      y_batch.reshape([batch_size, int(grid_h), int(grid_w), N_ANCHORS*(N_CLASSES + 5)])
 
 
 def calc_augment_level(y, scaling_factor=5):

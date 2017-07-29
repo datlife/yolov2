@@ -39,10 +39,9 @@ class MobileYolo(object):
         Build YOLOv2 Model
         """
 
-        features = feature_extractor if feature_extractor else darknet19(freeze_layers=True)
+        features        = feature_extractor if feature_extractor else darknet19(freeze_layers=True)
         object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=fine_grain_layer)
-
-        YOLOv2 = Model(inputs=[feature_extractor.input], outputs=[object_detector])
+        YOLOv2          = Model(inputs=[feature_extractor.input], outputs=[object_detector])
 
         return YOLOv2
 
@@ -116,7 +115,7 @@ class MobileYolo(object):
         image_dims = K.reshape(image_dims, [1, 4])
         boxes = boxes * image_dims
 
-        nms_index = tf.image.non_max_suppression(boxes, scores, tf.Variable(10), iou_threshold=iou_threshold)
+        nms_index = tf.image.non_max_suppression(boxes, scores, tf.Variable(20), iou_threshold=iou_threshold)
         boxes   = K.gather(boxes, nms_index)
         scores  = K.gather(scores, nms_index)
         classes = K.gather(classes, nms_index)
@@ -154,15 +153,16 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     x = _depthwise_conv_block(feature_map, 1024, 1.0, 1, block_id=14)
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=15)
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
+    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
 
     res_layer = conv_block(fine_grained, 64, (1, 1))
     reshaped = Lambda(space_to_depth_x2,
                       space_to_depth_x2_output_shape,
                       name='space_to_depth')(res_layer)
     x = concatenate([reshaped, x])
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
     x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=18)
-    x = _depthwise_conv_block(x, 512, 1.0, 1, block_id=19)
+    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=19)
+    x = _depthwise_conv_block(x, 512, 1.0, 1, block_id=20)
     detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1))(x)
 
     return detector

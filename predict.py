@@ -20,18 +20,27 @@ with open(CATEGORIES, 'r') as fl:
 
 def _main_():
     test_imgs, _ = parse_txt_to_inputs('training_extension.txt')
-    test_imgs  = shuffle(test_imgs)[0:30]
+    test_imgs  = shuffle(test_imgs)
+    import fnmatch
+    import os
+
+    test_imgs = []
+    for root, dirnames, filenames in os.walk('./testiamges'):
+        for filename in fnmatch.filter(filenames, '*.png'):
+            test_imgs.append(os.path.join(root, filename))
 
     with tf.Session() as sess:
-        yolov2 = MobileYolo(feature_extractor=darknet19(), num_anchors=N_ANCHORS, num_classes=N_CLASSES,
-                            fine_grain_layer='leaky_re_lu_13')
+        densenet = DenseNet(reduction=0.5, freeze_layers=True, weights_path='./weights/densenet121_weights_tf.h5')
+        yolov2 = MobileYolo(feature_extractor=densenet, num_anchors=N_ANCHORS, num_classes=N_CLASSES,
+                            fine_grain_layer='conv4_blk')
+        yolov2.model.summary()
         yolov2.model.load_weights(WEIGHTS_PATH)
 
         for img_path in test_imgs:
             orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
             orig_size = orig_img.shape
             img = cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT))
-            boxes_prediction, scores_prediction, classes_prediction = yolov2.predict(img, iou_threshold=0.5, score_threshold=0.1)
+            boxes_prediction, scores_prediction, classes_prediction = yolov2.predict(img, iou_threshold=0.4, score_threshold=0.05)
             bboxes = []
 
             # Create a list of  bounding boxes in original image size

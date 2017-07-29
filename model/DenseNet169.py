@@ -98,7 +98,7 @@ def conv_block(x, stage, branch, nb_filter, dropout_rate=None, weight_decay=1e-4
     eps = 1.1e-5
     conv_name_base = 'conv' + str(stage) + '_' + str(branch)
     relu_name_base = 'relu' + str(stage) + '_' + str(branch)
-
+    concat_axis = 3 # hack for Tensorflow
     # 1x1 Convolution (Bottleneck layer)
     inter_channel = nb_filter * 4
     x = BatchNormalization(epsilon=eps, axis=concat_axis, name=conv_name_base+'_x1_bn')(x)
@@ -135,7 +135,7 @@ def transition_block(x, stage, nb_filter, compression=1.0, dropout_rate=None, we
     conv_name_base = 'conv' + str(stage) + '_blk'
     relu_name_base = 'relu' + str(stage) + '_blk'
     pool_name_base = 'pool' + str(stage)
-
+    concat_axis = 3 # hack for tensorflow
     x = BatchNormalization(epsilon=eps, axis=concat_axis, name=conv_name_base+'_bn')(x)
     x = Scale(axis=concat_axis, name=conv_name_base+'_scale')(x)
     x = Activation('relu', name=relu_name_base)(x)
@@ -163,7 +163,7 @@ def dense_block(x, stage, nb_layers, nb_filter, growth_rate, dropout_rate=None, 
 
     eps = 1.1e-5
     concat_feat = x
-
+    concat_axis = 3 # hack for tensorflow
     for i in range(nb_layers):
         branch = i+1
         x = conv_block(concat_feat, stage, branch, growth_rate, dropout_rate, weight_decay)

@@ -108,5 +108,5 @@ if __name__ == "__main__":
     tree = SoftMaxTree(tree_file='../lisa.tree')
     print(tree.tree_dict[-1])
 
-    stop = tree.encode_label(index=59)  # 59 = stop in lisa.categories - 0-based array
+    stop = tree.encode_label(index=5)  # 59 = stop in lisa.categories - 0-based array
     print(stop)
