@@ -58,7 +58,8 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    densenet   = DenseNet(img_input=(608, 608, 3), reduction=0.5, freeze_layers=False, weights_path=FEATURE_EXTRACTOR_WEIGHTS)
+    densenet   = DenseNet(img_input=(608, 608, 3), reduction=0.5, freeze_layers=False, dropout_rate=0.3,
+                          weights_path=FEATURE_EXTRACTOR_WEIGHTS)
     yolov2     = MobileYolo(feature_extractor=densenet,
                             num_anchors=N_ANCHORS, num_classes=N_CLASSES,
                             fine_grain_layer='conv4_blk', dropout=0.3)
@@ -67,8 +68,8 @@ def _main_():
     # Construct Data Generator
     # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
     x_train, y_train = shuffle(x_train, y_train)
-    x_train = np.tile(x_train[0:5], 8).tolist()
-    y_train  = np.tile(y_train[0:5], [8, 1])
+    x_train = np.tile(x_train[0:30], 5).tolist()
+    y_train  = np.tile(y_train[0:30], [5, 1])
     print([name.split('/')[-1].split('.')[0] for name in x_train])
     for fname in x_train[0:10]:
         print(fname)
@@ -89,12 +90,12 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=30,
+                               steps_per_epoch=100,
                                validation_data=val_data_gen,
-                               validation_steps=5,
+                               validation_steps=10,
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=2, verbose=1)
+                               workers=3, verbose=1)
 
     yolov2.model.save_weights('yolov2.weights')
 
