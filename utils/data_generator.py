@@ -70,7 +70,7 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
     if augment_data is True:
         augment_level = calc_augment_level(y, scaling_factor)  # (less data / class means more augmentation)
 
-    # Get list of classes
+        # Get list of classes
     fl = open(CATEGORIES, 'r')
     CLASSES = np.array(fl.read().splitlines())
     fl.close()

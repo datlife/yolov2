@@ -18,12 +18,13 @@ import numpy as np
 from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Convert LISA Annotation into text file")
-parser.add_argument('--lisa_path', '-p', type=str, help='path to training/testing lisa dataset')
-parser.add_argument('--output_filename', '-o', type=str, default='training.txt', help='Output file name')
+parser.add_argument('--path', '-p', type=str, help='path to training/testing lisa dataset')
+parser.add_argument('--output', '-o', type=str, default='training.txt', help='Output file name')
 
 args = parser.parse_args()
-lisa_path = args.lisa_path
-out_fname = args.output_filename
+lisa_path = args.path
+out_fname = args.output
+
 
 
 def _main_():

@@ -11,6 +11,7 @@ Return
    A weight file `yolov2.weights` for evaluation
 
 """
+import os
 import keras
 import keras.backend as K
 from keras.callbacks import TensorBoard
@@ -31,9 +32,10 @@ parser = ArgumentParser(description="Train YOLOv2")
 parser.add_argument('-p', '--path', help="Path to training data set (e.g. /dataset/lisa/ ", type=str,  default='training.txt')
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
-parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=8)
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
-parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='/media/sharedHDD/yolo_model/')
+parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=2)
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.00001)
+parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='./backup/')
+parser.add_argument('--feature_extractor_weights', help="Path to feature extractor pre-trained weights", type=str, default=None)
 
 args = parser.parse_args()
 annotation_path = args.path
@@ -42,19 +44,12 @@ BATCH_SIZE      = args.batch
 EPOCHS          = args.epochs
 LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
 BACK_UP_PATH    = args.backup
+FEATURE_EXTRACTOR_WEIGHTS = args.feature_extractor_weights
 
 K.clear_session()  # Avoid duplicate model
 
-
-def learning_rate_schedule(epochs):
-    if epochs < 60:
-        return LEARNING_RATE
-    if 60 <= epochs < 90:
-        return LEARNING_RATE / 10.
-    if 90 <= epochs < 140:
-        return LEARNING_RATE / 100.
-    if epochs >= 140:
-        return LEARNING_RATE / 1000.
+if os.path.isdir(BACK_UP_PATH) is False:
+    os.makedirs(BACK_UP_PATH)
 
 
 def _main_():
@@ -63,20 +58,21 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    densenet   = DenseNet(reduction=0.5, freeze_layers=True, weights_path='./weights/densenet121_weights_tf.h5')
-    yolov2     = MobileYolo(feature_extractor=densenet, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer='conv4_blk')
+    densenet   = DenseNet(img_input=(608, 608, 3), reduction=0.5, freeze_layers=False, weights_path=FEATURE_EXTRACTOR_WEIGHTS)
+    yolov2     = MobileYolo(feature_extractor=densenet,
+                            num_anchors=N_ANCHORS, num_classes=N_CLASSES,
+                            fine_grain_layer='conv4_blk', dropout=0.3)
     yolov2.model.summary()
-
+    #
     # Construct Data Generator
     # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
-
     x_train, y_train = shuffle(x_train, y_train)
     x_train = np.tile(x_train[0:5], 8).tolist()
     y_train  = np.tile(y_train[0:5], [8, 1])
     print([name.split('/')[-1].split('.')[0] for name in x_train])
     for fname in x_train[0:10]:
         print(fname)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
     val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training
@@ -96,7 +92,7 @@ def _main_():
                                steps_per_epoch=30,
                                validation_data=val_data_gen,
                                validation_steps=5,
-                               epochs=20, initial_epoch=0,
+                               epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=2, verbose=1)
 
@@ -111,10 +107,26 @@ def create_data_generator(x_train, y_train):
     :return:
     """
     x_train, y_train = shuffle(x_train, y_train)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
     x_test, y_test = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
     val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
     return train_data_gen, val_data_gen
+
+
+def learning_rate_schedule(epochs):
+    """
+    Learning Scheduler Implementation of YOLO9000
+    :param epochs:
+    :return:
+    """
+    if epochs < 60:
+        return LEARNING_RATE
+    if 60 <= epochs < 90:
+        return LEARNING_RATE / 10.
+    if 90 <= epochs < 140:
+        return LEARNING_RATE / 100.
+    if epochs >= 140:
+        return LEARNING_RATE / 1000.
 
 
 def setup_debugger(yolov2):

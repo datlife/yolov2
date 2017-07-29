@@ -13,7 +13,9 @@ from keras.layers import Conv2D
 from keras.layers import Lambda
 from keras.models import Model
 from model.darknet19 import darknet19
-from model.net_builder import _depthwise_conv_block, conv_block
+from model.net_builder import conv_block
+from densenet import dense_block, Scale
+from keras.layers import BatchNormalization, Activation
 from utils.augment_img import preprocess_img
 from cfg import *
 
@@ -22,7 +24,7 @@ class MobileYolo(object):
     """
     YOLOv2 Meta-Architecture
     """
-    def __init__(self, feature_extractor=None, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer=''):
+    def __init__(self, feature_extractor=None, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer='', dropout=None):
         """
         :param feature_extractor: A high-level CNN Classifier. One can plug and update an new feature extractor
                     e.g. :  Darknet19 (YOLOv2), MobileNet, ResNet-50
@@ -32,15 +34,15 @@ class MobileYolo(object):
         :param num_classes: int 
                    - number of classes in training data
         """
-        self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer)
+        self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout=None)
 
-    def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer):
+    def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout=None):
         """
         Build YOLOv2 Model
         """
 
         features        = feature_extractor if feature_extractor else darknet19(freeze_layers=True)
-        object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=fine_grain_layer)
+        object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=fine_grain_layer, dropout=dropout)
         YOLOv2          = Model(inputs=[feature_extractor.input], outputs=[object_detector])
 
         return YOLOv2
@@ -135,7 +137,7 @@ class MobileYolo(object):
         raise NotImplemented
 
 
-def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer='conv4_blk'):
+def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer='conv4_blk', dropout=None):
     """
     Constructor for Box Regression Model (RPN-ish) for YOLOv2
 
@@ -144,27 +146,33 @@ def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_laye
     :param num_classes:
     :param fine_grain_layer: default: 43
                 layer [(3, 3) 512] of Darknet19 before last max pool
+    :param dropout: range from 0 -1
     :return: 
     """
     # Ref: YOLO9000 paper[ "Training for detection" section]
-
+    eps = 1.1e-5
     fine_grained = feature_extractor.get_layer(name=fine_grain_layer).output
 
     feature_map = feature_extractor.output
-    x = _depthwise_conv_block(feature_map, 1024, 1.0, 1, block_id=14)
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=15)
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
 
-    res_layer = conv_block(fine_grained, 512, (1, 1))
+    x, nb_filters = dense_block(feature_map, stage=7, nb_layers=6, nb_filter=128, growth_rate=32, dropout_rate=dropout)
+    x = BatchNormalization(epsilon=eps, axis=3, name='conv'+str(7)+'_blk_bn')(x)
+    x = Scale(axis=3, name='conv'+str(7)+'_blk_scale')(x)
+    x = Activation('relu', name='relu'+str(7)+'_blk')(x)
+
+    res_layer = conv_block(fine_grained, 128, (1, 1))
     reshaped = Lambda(space_to_depth_x2,
                       space_to_depth_x2_output_shape,
                       name='space_to_depth')(res_layer)
     x = concatenate([reshaped, x])
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=18)
-    x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=19)
-    x = _depthwise_conv_block(x, 512, 1.0, 1, block_id=20)
+
+    x, nb_filters = dense_block(x, stage=8, nb_layers=6, nb_filter=128, growth_rate=32, dropout_rate=dropout)
+    x = BatchNormalization(epsilon=eps, axis=3, name='conv'+str(8)+'_blk_bn')(x)
+    x = Scale(axis=3, name='conv'+str(8)+'_blk_scale')(x)
+    x = Activation('relu', name='relu'+str(8)+'_blk')(x)
+
     detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1))(x)
+
 
     return detector
 

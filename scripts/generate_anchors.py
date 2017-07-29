@@ -23,12 +23,14 @@ python generate_anchors.py --num_anchors 5 --label_bath training.txt --img_width
 python generate_anchors.py -n 5 -p training.txt -w 1280 -h 960
 s
 """
-# import cv2
-import sys
+from PIL import Image
+# Add relative path
 import os
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'utils'))
+import sys
+module_path = os.path.abspath(os.path.join('..'))
+if module_path not in sys.path:
+    sys.path.append(module_path)
 
-from utils.box import Box, box_iou
 from utils.box import Box, box_iou
 from argparse import ArgumentParser
 from cfg import *
@@ -36,34 +38,31 @@ from cfg import *
 
 parser = ArgumentParser(description="Generate Anchors from ground truth boxes using K-mean clustering")
 
-parser.add_argument('-n', '--num_anchors',
-                    type=int,   default=5, help="Number of anchors")
-parser.add_argument('-p', '--label_path',
-                    type=str, default='data/training.txt', help="Path to Training txt file")
+parser.add_argument('-n', '--num_anchors', type=int, default=5, help="Number of anchors")
+parser.add_argument('-p', '--label_path',  type=str, default='data/training.txt', help="Path to Training txt file")
 
-parser.add_argument('-width', '--image_width',
-                    type=int, default=1280, help="Image Width")
-parser.add_argument('-height', '--image_height',
-                    type=int, default=960, help="Image Height")
 
 
 def __main__():
     args = parser.parse_args()
     k            = args.num_anchors
     label_path   = args.label_path
-    img_width    = args.image_width
-    img_height   = args.image_height
+
     gt_boxes     = []
 
     # Extract bounding boxes from training data
     with open(label_path, "r") as f:
         lines = f.readlines()
         # Update aspect ratio
-        aspect_ratio = [IMG_INPUT / float(img_width), IMG_INPUT / float(img_height)]
-        print(aspect_ratio)
+        id = 0
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
+            with Image.open(img_path) as img:
+                img_width, img_height = img.size
+                # id += 1
+                # print(img_height, img_width, id)
+            aspect_ratio = [IMG_INPUT / float(img_width), IMG_INPUT / float(img_height)]
             box = Box(0, 0, float(w) * aspect_ratio[0] / SHRINK_FACTOR, float(h) * aspect_ratio[1] / SHRINK_FACTOR)
             gt_boxes.append(box)
 
