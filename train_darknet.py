@@ -82,7 +82,7 @@ def _main_():
     small_gt  = np.tile(y_train[0:5], [8, 1])
     for fname in x_train[0:10]:
         print(fname)
-    train_data_gen = flow_from_list(small_samples, small_gt, batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen = flow_from_list(small_samples, small_gt, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
     val_data_gen = flow_from_list(small_samples, small_gt,   batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training

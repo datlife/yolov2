@@ -93,20 +93,16 @@ class SoftMaxTree(object):
         if self.tree_dict[idx].children:   # traverse until reaching the leaf
 
             first_child = self.tree_dict[idx].children[0].id
-            if idx == -1:  # root
-                children_pred = K.softmax(logits[..., first_child:first_child + len(self.tree_dict[idx].children)])
-            else:
-                id = self.tree_dict[idx].parent.children[0].id
-                parent_softmax = K.softmax(logits[..., id : id + len(self.tree_dict[idx].parent.children)])
-                for i, child in enumerate(self.tree_dict[idx].parent.children):
-                    if child.id == idx:
-                        parent_prob = parent_softmax[..., i:i+1]
-                children_pred = K.softmax(logits[..., first_child:first_child + len(self.tree_dict[idx].children)]) * parent_prob
+            # if idx == -1:  # root
+            #     children_pred = K.softmax(logits[..., first_child:first_child + len(self.tree_dict[idx].children)])
+            # else:
+            #     children_pred = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
 
+            children_pred = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
             children_gt   = labels[...,  first_child:first_child + len(self.tree_dict[idx].children)]
 
             # Calculate soft-max on current node's children
-            cross_entropy = tf.reduce_sum(- children_gt * tf.log(children_pred))
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=children_gt, logits=children_pred)
             loss = tf.reduce_mean(cross_entropy)
 
             # Calculate loss of each children

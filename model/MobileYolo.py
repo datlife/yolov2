@@ -13,10 +13,8 @@ from keras.layers import Conv2D
 from keras.layers import Lambda
 from keras.models import Model
 from keras.regularizers import l2
-from model.darknet19 import darknet19
+from model.net_builder import _depthwise_conv_block
 from model.net_builder import conv_block
-from densenet import dense_block, Scale
-from keras.layers import BatchNormalization, Activation
 from utils.augment_img import preprocess_img
 from cfg import *
 
@@ -44,29 +42,31 @@ class MobileYolo(object):
         Input :  feature map from feature extractor
         Ouput :  prediction
         """
-        eps = 1.1e-5
-        global concat_axis
-        concat_axis = 3
         fine_grained = feature_extractor.get_layer(name=fine_grain_layer).output
         feature_map = feature_extractor.output
-        # Densely YOLOv2 Object Detector part
-        x, nb_filters = dense_block(feature_map, stage=7, nb_layers=6, nb_filter=128, growth_rate=48, dropout_rate=dropout)
-        x = BatchNormalization(epsilon=eps, axis=3, name='conv' + str(7) + '_blk_bn')(x)
-        x = Scale(axis=3, name='conv' + str(7) + '_blk_scale')(x)
-        x = Activation('relu', name='relu' + str(7) + '_blk')(x)
+        fine_grained2 = feature_extractor.layers[26].output
+
+        x = _depthwise_conv_block(feature_map, 1024, 1.0, 1, block_id=14)
+        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=15)
 
         res_layer = conv_block(fine_grained, 64, (1, 1))
-        reshaped = Lambda(space_to_depth_x2, space_to_depth_x2_output_shape, name='space_to_depth')(res_layer)
-        x = concatenate([reshaped, x])
+        res_layer2 = conv_block(fine_grained2, 64, (1, 1))
+        reshaped = Lambda(space_to_depth_x2,
+                          space_to_depth_x2_output_shape,
+                          name='space_to_depth')(res_layer)
 
-        x, nb_filters = dense_block(x, stage=8, nb_layers=6, nb_filter=128, growth_rate=48, dropout_rate=dropout)
-        x = BatchNormalization(epsilon=eps, axis=3, name='conv' + str(8) + '_blk_bn')(x)
-        x = Scale(axis=3, name='conv' + str(8) + '_blk_scale')(x)
-        x = Activation('relu', name='relu' + str(8) + '_blk')(x)
+        reshaped2 = Lambda(space_to_depth_x4,
+                           space_to_depth_x4_output_shape,
+                           name='space_to_depth2')(res_layer2)
+        x = concatenate([reshaped2, reshaped, x])
 
-        detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1), kernel_regularizer=l2(5e-1))(x)
+        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
+        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
 
-        Densely_Yolo          = Model(inputs=[feature_extractor.input], outputs=detector)
+        detector = Conv2D(filters=(num_anchors * (num_classes + 5)),
+                          kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(x)
+
+        Densely_Yolo = Model(inputs=[feature_extractor.input], outputs=detector)
 
         return Densely_Yolo
 
