@@ -12,6 +12,7 @@ from keras.layers.merge import concatenate
 from keras.layers import Conv2D
 from keras.layers import Lambda
 from keras.models import Model
+from keras.regularizers import l2
 from model.darknet19 import darknet19
 from model.net_builder import conv_block
 from densenet import dense_block, Scale
@@ -39,13 +40,35 @@ class MobileYolo(object):
     def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout=None):
         """
         Build YOLOv2 Model
+
+        Input :  feature map from feature extractor
+        Ouput :  prediction
         """
+        eps = 1.1e-5
+        global concat_axis
+        concat_axis = 3
+        fine_grained = feature_extractor.get_layer(name=fine_grain_layer).output
+        feature_map = feature_extractor.output
+        # Densely YOLOv2 Object Detector part
+        x, nb_filters = dense_block(feature_map, stage=7, nb_layers=6, nb_filter=128, growth_rate=48, dropout_rate=dropout)
+        x = BatchNormalization(epsilon=eps, axis=3, name='conv' + str(7) + '_blk_bn')(x)
+        x = Scale(axis=3, name='conv' + str(7) + '_blk_scale')(x)
+        x = Activation('relu', name='relu' + str(7) + '_blk')(x)
 
-        features        = feature_extractor if feature_extractor else darknet19(freeze_layers=True)
-        object_detector = yolov2_detector(features, num_anchors, num_classes, fine_grain_layer=fine_grain_layer, dropout=dropout)
-        YOLOv2          = Model(inputs=[feature_extractor.input], outputs=[object_detector])
+        res_layer = conv_block(fine_grained, 64, (1, 1))
+        reshaped = Lambda(space_to_depth_x2, space_to_depth_x2_output_shape, name='space_to_depth')(res_layer)
+        x = concatenate([reshaped, x])
 
-        return YOLOv2
+        x, nb_filters = dense_block(x, stage=8, nb_layers=6, nb_filter=128, growth_rate=48, dropout_rate=dropout)
+        x = BatchNormalization(epsilon=eps, axis=3, name='conv' + str(8) + '_blk_bn')(x)
+        x = Scale(axis=3, name='conv' + str(8) + '_blk_scale')(x)
+        x = Activation('relu', name='relu' + str(8) + '_blk')(x)
+
+        detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1), kernel_regularizer=l2(5e-1))(x)
+
+        Densely_Yolo          = Model(inputs=[feature_extractor.input], outputs=detector)
+
+        return Densely_Yolo
 
     def predict(self, img, iou_threshold=0.5, score_threshold=0.4, mode=0):
         """
@@ -81,14 +104,12 @@ class MobileYolo(object):
         c_xy = tf.stack([cx, cy], -1)
         c_xy = tf.to_float(c_xy)
 
-        # resized_anchors = ANCHORS * tf.cast([GRID_W, GRID_H], tf.float32)
         anchors_tensor = tf.to_float(K.reshape(K.variable(ANCHORS), [1, 1, 1, N_ANCHORS, 2]))
         netout_size = tf.to_float(K.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]))
 
         box_xy          = K.sigmoid(prediction[..., :2])
         box_wh          = K.exp(prediction[..., 2:4])
         box_confidence  = K.sigmoid(prediction[..., 4:5])
-        box_class_probs = K.softmax(prediction[..., 5:])
 
         # Shift center points to its grid cell accordingly (Ref: YOLO-9000 loss function)
         box_xy    = (box_xy + c_xy) / netout_size
@@ -100,8 +121,10 @@ class MobileYolo(object):
         boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
 
         # @TODO different level of soft-max
-        # box_scores = box_confidence * box_class_probs
-        box_scores = box_confidence
+        if mode is 0:
+            # The first level
+            box_scores = box_confidence * K.softmax(prediction[..., 0:5])
+
         box_classes = K.argmax(box_scores, -1)
         box_class_scores = K.max(box_scores, -1)
         prediction_mask = (box_class_scores >= score_threshold)
@@ -123,8 +146,6 @@ class MobileYolo(object):
         scores  = K.gather(scores, nms_index)
         classes = K.gather(classes, nms_index)
 
-        # tf.global_variables_initializer().run()
-        # new_ops = tf.initialize_variables([boxes, scores, classes])
         init = tf.local_variables_initializer()
         K.get_session().run(init)
         boxes_prediction = boxes.eval()
@@ -135,46 +156,6 @@ class MobileYolo(object):
 
     def loss(self):
         raise NotImplemented
-
-
-def yolov2_detector(feature_extractor, num_anchors, num_classes, fine_grain_layer='conv4_blk', dropout=None):
-    """
-    Constructor for Box Regression Model (RPN-ish) for YOLOv2
-
-    :param feature_extractor: 
-    :param num_anchors:
-    :param num_classes:
-    :param fine_grain_layer: default: 43
-                layer [(3, 3) 512] of Darknet19 before last max pool
-    :param dropout: range from 0 -1
-    :return: 
-    """
-    # Ref: YOLO9000 paper[ "Training for detection" section]
-    eps = 1.1e-5
-    fine_grained = feature_extractor.get_layer(name=fine_grain_layer).output
-
-    feature_map = feature_extractor.output
-
-    x, nb_filters = dense_block(feature_map, stage=7, nb_layers=6, nb_filter=128, growth_rate=32, dropout_rate=dropout)
-    x = BatchNormalization(epsilon=eps, axis=3, name='conv'+str(7)+'_blk_bn')(x)
-    x = Scale(axis=3, name='conv'+str(7)+'_blk_scale')(x)
-    x = Activation('relu', name='relu'+str(7)+'_blk')(x)
-
-    res_layer = conv_block(fine_grained, 128, (1, 1))
-    reshaped = Lambda(space_to_depth_x2,
-                      space_to_depth_x2_output_shape,
-                      name='space_to_depth')(res_layer)
-    x = concatenate([reshaped, x])
-
-    x, nb_filters = dense_block(x, stage=8, nb_layers=6, nb_filter=128, growth_rate=32, dropout_rate=dropout)
-    x = BatchNormalization(epsilon=eps, axis=3, name='conv'+str(8)+'_blk_bn')(x)
-    x = Scale(axis=3, name='conv'+str(8)+'_blk_scale')(x)
-    x = Activation('relu', name='relu'+str(8)+'_blk')(x)
-
-    detector = Conv2D(filters=(num_anchors * (num_classes + 5)), kernel_size=(1, 1))(x)
-
-
-    return detector
 
 
 def space_to_depth_x2(x):

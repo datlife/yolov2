@@ -81,11 +81,6 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             labels = y[i * batch_size:(i * batch_size) + batch_size]
             X = []
             Y = []
-            if i % 10 == 0 and augment_data is True:
-                randint = np.random.random_integers(low=0, high=(len(MULTI_SCALE) - 1))
-                multi_scale = MULTI_SCALE[randint]
-                # print("Multi-scale updated to ", multi_scale)
-
             for filename, label in list(zip(f_name, labels)):
                 bbox, label = label
 
@@ -95,12 +90,6 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
                 img = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 height, width, _ = img.shape
                 img = cv2.resize(img, (IMG_INPUT, IMG_INPUT))
-
-                # Multi-scale training
-                if augment_data:
-                    new_height = int(IMG_INPUT * multi_scale)
-                    new_width  = int(IMG_INPUT * multi_scale)
-                    img = cv2.resize(img, (new_width, new_height))
 
                 processed_img = preprocess_img(img)
 
@@ -137,12 +126,8 @@ def flow_from_list(x, y, batch_size=32, scaling_factor=5, augment_data=True):
             # Shuffle X, Y again
             X, Y = shuffle(np.array(X), np.array(Y))
             for z in list(range(int(len(X) / batch_size))):
-                if augment_data:
-                    grid_w = new_width  / SHRINK_FACTOR
-                    grid_h = new_height / SHRINK_FACTOR
-                else:
-                    grid_w = IMG_INPUT / SHRINK_FACTOR
-                    grid_h = IMG_INPUT / SHRINK_FACTOR
+                grid_w = IMG_INPUT / SHRINK_FACTOR
+                grid_h = IMG_INPUT / SHRINK_FACTOR
 
                 # Construct detection mask
                 y_batch = np.zeros((batch_size, int(grid_h), int(grid_w), N_ANCHORS, 5 + N_CLASSES))
@@ -177,7 +162,7 @@ def calc_augment_level(y, scaling_factor=5):
     mean = frequencies.mean(axis=0)  # average images per traffic sign
 
     df = pd.DataFrame({'label': categories, 'frequency': frequencies})
-    df['scaling_factor'] = df.apply(lambda row: int(scaling_factor*(mean / row['frequency'])), axis=1)
+    df['scaling_factor'] = df.apply(lambda row: int(np.ceil(scaling_factor*(mean / row['frequency']))), axis=1)
     return df
 
 

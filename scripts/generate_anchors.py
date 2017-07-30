@@ -42,7 +42,6 @@ parser.add_argument('-n', '--num_anchors', type=int, default=5, help="Number of 
 parser.add_argument('-p', '--label_path',  type=str, default='data/training.txt', help="Path to Training txt file")
 
 
-
 def __main__():
     args = parser.parse_args()
     k            = args.num_anchors
@@ -55,17 +54,16 @@ def __main__():
         lines = f.readlines()
         # Update aspect ratio
         id = 0
+        print("Calculating Anchors....")
         for line in lines:
             img_path, x1, y1, x2, y2, label = line.rstrip().split(",")
             xc, yc, w, h = convert_bbox(x1, y1, x2, y2)
             with Image.open(img_path) as img:
                 img_width, img_height = img.size
-                # id += 1
-                # print(img_height, img_width, id)
             aspect_ratio = [IMG_INPUT / float(img_width), IMG_INPUT / float(img_height)]
             box = Box(0, 0, float(w) * aspect_ratio[0] / SHRINK_FACTOR, float(h) * aspect_ratio[1] / SHRINK_FACTOR)
             gt_boxes.append(box)
-
+        print("Done!")
     # ############## K-MEAN CLUSTERING ########################
     anchors, avg_iou = k_mean_cluster(k, gt_boxes)
     print("K = : {:2} | AVG_IOU:{:-4f} ".format(k, avg_iou))

@@ -34,6 +34,7 @@ parser.add_argument('-e', '--epochs',  help='Number of epochs for training', typ
 parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=8)
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='/media/sharedHDD/yolo_model/')
+parser.add_argument('--feature_extractor_weights', help="Path to feature extractor pre-trained weights", type=str, default=None)
 
 args = parser.parse_args()
 annotation_path = args.path
@@ -42,6 +43,7 @@ BATCH_SIZE      = args.batch
 EPOCHS          = args.epochs
 LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
 BACK_UP_PATH    = args.backup
+FEATURE_EXTRACTOR_WEIGHTS = args.feature_extractor_weights
 
 K.clear_session()  # Avoid duplicate model
 
@@ -63,15 +65,25 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), pretrained_weights=None)
-    yolov2     = MobileYolo(feature_extractor=darknet, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer='leaky_re_lu_13')
+    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), freeze_layers=True, pretrained_weights=FEATURE_EXTRACTOR_WEIGHTS)
+    yolov2     = MobileYolo(feature_extractor=darknet,
+                            num_anchors=N_ANCHORS, num_classes=N_CLASSES,
+                            fine_grain_layer='leaky_re_lu_13',
+                            dropout=0.2)
     yolov2.model.summary()
 
     for layer in darknet.layers:
         layer.trainable = False
 
     # Construct Data Generator
-    train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+    # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+    x_train, y_train = shuffle(x_train, y_train)
+    small_samples = np.tile(x_train[0:5], 8).tolist()
+    small_gt  = np.tile(y_train[0:5], [8, 1])
+    for fname in x_train[0:10]:
+        print(fname)
+    train_data_gen = flow_from_list(small_samples, small_gt, batch_size=BATCH_SIZE, augment_data=False)
+    val_data_gen = flow_from_list(small_samples, small_gt,   batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -87,9 +99,9 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=100,  # len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=int(len(x_train)*0.2/BATCH_SIZE),
+                               validation_steps=10,  # int(len(x_train)*0.2/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=3, verbose=1)

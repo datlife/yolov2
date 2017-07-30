@@ -33,7 +33,7 @@ parser.add_argument('-p', '--path', help="Path to training data set (e.g. /datas
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
 parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=2)
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.00001)
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001)
 parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='./backup/')
 parser.add_argument('--feature_extractor_weights', help="Path to feature extractor pre-trained weights", type=str, default=None)
 
@@ -58,23 +58,21 @@ def _main_():
     x_train, y_train = parse_txt_to_inputs(annotation_path)
 
     # Build Model
-    densenet   = DenseNet(img_input=(608, 608, 3), reduction=0.5, freeze_layers=False, dropout_rate=0.3,
+    densenet   = DenseNet(img_input=(IMG_INPUT, IMG_INPUT, 3), reduction=0.5, freeze_layers=True, dropout_rate=0.4,
                           weights_path=FEATURE_EXTRACTOR_WEIGHTS)
-    yolov2     = MobileYolo(feature_extractor=densenet,
-                            num_anchors=N_ANCHORS, num_classes=N_CLASSES,
-                            fine_grain_layer='conv4_blk', dropout=0.3)
+    yolov2     = MobileYolo(feature_extractor=densenet, num_anchors=N_ANCHORS, num_classes=N_CLASSES,
+                            fine_grain_layer='conv4_blk', dropout=0.4)
     yolov2.model.summary()
-    #
+
     # Construct Data Generator
     # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
     x_train, y_train = shuffle(x_train, y_train)
-    x_train = np.tile(x_train[0:30], 5).tolist()
-    y_train  = np.tile(y_train[0:30], [5, 1])
-    print([name.split('/')[-1].split('.')[0] for name in x_train])
+    small_samples = np.tile(x_train[0:5], 8).tolist()
+    small_gt  = np.tile(y_train[0:5], [8, 1])
     for fname in x_train[0:10]:
         print(fname)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
-    val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen = flow_from_list(small_samples, small_gt, batch_size=BATCH_SIZE, augment_data=False)
+    val_data_gen = flow_from_list(small_samples, small_gt,   batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -90,7 +88,7 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=100,
+                               steps_per_epoch=2*len(small_samples)/BATCH_SIZE,
                                validation_data=val_data_gen,
                                validation_steps=10,
                                epochs=EPOCHS, initial_epoch=0,
@@ -108,9 +106,9 @@ def create_data_generator(x_train, y_train):
     :return:
     """
     x_train, y_train = shuffle(x_train, y_train)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
-    x_test, y_test = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
-    val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
+    train_data_gen   = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True, scaling_factor=AUGMENT_LEVEL)
+    x_test, y_test   = shuffle(x_train, y_train)[0:int(len(x_train)*0.2)]
+    val_data_gen     = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
     return train_data_gen, val_data_gen
 
 
@@ -145,10 +143,9 @@ if __name__ == "__main__":
     _main_()
 
     # x_train, y_train = shuffle(x_train, y_train)
-    # x_train = np.tile(x_train[0:30], 8).tolist()
-    # y_train  = np.tile(y_train[0:30], [8, 1])
-    # print([name.split('/')[-1].split('.')[0] for name in x_train])
+    # small_samples = np.tile(x_train[0:30], 8).tolist()
+    # small_gt  = np.tile(y_train[0:30], [8, 1])
     # for fname in x_train[0:10]:
     #     print(fname)
-    # train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=True)
-    # val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)
+    # train_data_gen = flow_from_list(small_samples, small_gt, batch_size=BATCH_SIZE, augment_data=True)
+    # val_data_gen = flow_from_list(small_samples, small_gt,   batch_size=BATCH_SIZE, augment_data=False)

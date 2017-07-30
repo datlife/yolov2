@@ -100,6 +100,13 @@ def convert_bbox(x1, y1, x2, y2):
     return xc, yc, w, h
 
 
+def xywh_to_xyxy(xc, yc, w, h):
+    x1 = xc - w * 0.5
+    y1 = yc - h * 0.5
+    x2 = xc + w * 0.5
+    y2 = yc + h * 0.5
+    return x1, y1, x2, y2
+
 def scale_rel_box(img_size, box):
     """
     Scale bounding box relative to image size

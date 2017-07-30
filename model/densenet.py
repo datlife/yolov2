@@ -12,6 +12,9 @@ except ImportError:
     from keras import initializers as initializations
 import keras.backend as K
 
+global concat_axis
+concat_axis = 3
+
 
 def DenseNet(img_input=(224, 224, 3), nb_dense_block=4, growth_rate=32, freeze_layers=True, nb_filter=64, reduction=0.0, dropout_rate=0.0, weight_decay=1e-4, classes=1000, weights_path=None):
     '''Instantiate the DenseNet 121 architecture,
@@ -33,12 +36,8 @@ def DenseNet(img_input=(224, 224, 3), nb_dense_block=4, growth_rate=32, freeze_l
 
     # Handle Dimension Ordering for different backends
     global concat_axis
-    if K.image_dim_ordering() == 'tf':
-      concat_axis = 3
-      img_input = Input(shape=img_input, name='data')
-    else:
-      concat_axis = 1
-      img_input = Input(shape=img_input, name='data')
+    concat_axis = 3
+    img_input = Input(shape=img_input, name='data')
 
     # From architecture for ImageNet (Table 1 in the paper)
     nb_filter = 64
