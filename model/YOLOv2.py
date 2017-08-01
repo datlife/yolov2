@@ -12,14 +12,13 @@ from keras.layers.merge import concatenate
 from keras.layers import Conv2D
 from keras.layers import Lambda
 from keras.models import Model
-from keras.layers import Dropout
 from keras.regularizers import l2
-from model.net_builder import conv_block, _depthwise_conv_block
+from model.net_builder import conv_block
 from utils.augment_img import preprocess_img
 from cfg import *
 
 
-class MobileYolo(object):
+class YOLOv2(object):
     """
     YOLOv2 Meta-Architecture
     """
@@ -28,9 +27,9 @@ class MobileYolo(object):
         :param feature_extractor: A high-level CNN Classifier. One can plug and update an new feature extractor
                     e.g. :  Darknet19 (YOLOv2), MobileNet, ResNet-50
                     **NOTE** Update the SHRINK_FACTOR accordingly if you use other feature extractor different than DarkNet
-        :param num_anchors: int  
-                    - number of anchors   
-        :param num_classes: int 
+        :param num_anchors: int
+                    - number of anchors
+        :param num_classes: int
                    - number of classes in training data
         """
         self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout)
@@ -43,32 +42,24 @@ class MobileYolo(object):
         Ouput :  prediction
         """
         fine_grained = feature_extractor.get_layer(name=fine_grain_layer[0]).output
-        fine_grained2 = feature_extractor.get_layer(name=fine_grain_layer[1]).output
-
         feature_map = feature_extractor.output
-        x = Dropout(rate=dropout)(feature_map)
-        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=14)
-        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=15)
-        x = Dropout(rate=dropout)(x)
+        x = conv_block(feature_map, 1024, (3, 3))
+        x = conv_block(x, 1024, (3, 3))
 
         res_layer = conv_block(fine_grained, 64, (1, 1))
-        res_layer2 = conv_block(fine_grained2, 128, (1, 1))
-        reshaped = Lambda(space_to_depth_x2, space_to_depth_x2_output_shape, name='space_to_depth')(res_layer)
-        reshaped2 = Lambda(space_to_depth_x4, space_to_depth_x4_output_shape, name='space_to_depth2')(res_layer2)
-        x = concatenate([reshaped2, reshaped, x])
-        x = Dropout(rate=dropout)(x)
+        reshaped = Lambda(space_to_depth_x2,
+                          space_to_depth_x2_output_shape,
+                          name='space_to_depth')(res_layer)
 
-        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
-        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
-        x = Dropout(rate=Dropout)(x)
+        x = concatenate([reshaped, x])
+        x = conv_block(x, 1024, (3, 3))
 
-        detector = Conv2D(filters=(num_anchors * (num_classes + 5)),
-                          kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(x)
+        detector = Conv2D(filters=(num_anchors * (num_classes + 5)), name='yolov2', kernel_size=(1, 1))(x)
 
         YOLOv2 = Model(inputs=[feature_extractor.input], outputs=detector)
         return YOLOv2
 
-    def predict(self, img, iou_threshold=0.5, score_threshold=0.4, mode=0):
+    def predict(self, img, iou_threshold=0.5, score_threshold=0.4, mode = 0):
         """
         Perform a prediction with non-max suppression
         :param img:
@@ -157,6 +148,14 @@ class MobileYolo(object):
         raise NotImplemented
 
 
+def sigmoid(x):
+    return 1. / (1.  + np.exp(-x))
+
+
+def softmax(x):
+    return np.exp(x) / np.sum(np.exp(x), axis=0)
+
+
 def space_to_depth_x2(x):
     """Thin wrapper for Tensor flow space_to_depth with block_size=2."""
     # Import currently required to make Lambda work.
@@ -170,18 +169,3 @@ def space_to_depth_x2_output_shape(input_shape):
     """
     return (input_shape[0], input_shape[1] // 2, input_shape[2] // 2, 4 * input_shape[3]) if input_shape[1] else \
         (input_shape[0], None, None, 4 * input_shape[3])
-
-
-def space_to_depth_x4(x):
-    """Thin wrapper for Tensor flow space_to_depth with block_size=2."""
-    # Import currently required to make Lambda work.
-    import tensorflow as tf
-    return tf.space_to_depth(x, block_size=4)
-
-
-def space_to_depth_x4_output_shape(input_shape):
-    """Determine space_to_depth output shape for block_size=2.
-    Note: For Lambda with TensorFlow backend, output shape may not be needed.
-    """
-    return (input_shape[0], input_shape[1] // 4, input_shape[2] // 4, 16 * input_shape[3]) if input_shape[1] else \
-        (input_shape[0], None, None, 16 * input_shape[3])

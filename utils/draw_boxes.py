@@ -15,7 +15,7 @@ def draw(img, boxes):
         p1 = (box.x1, box.y1)
         p2 = (box.x2, box.y2)
         label = '{} {:.2f}%'.format(box.cls, box.score * 100)
-        label = '{}'.format(box.cls)
+        # label = '{}'.format(box.cls)
 
         draw = ImageDraw.Draw(image)
         # font = ImageFont.truetype()

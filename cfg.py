@@ -9,7 +9,7 @@ HIER_TREE     = SoftMaxTree(tree_file='lisa.tree')  # Hierarchical Soft-max Impl
 # Optional
 IMG_INPUT     = 608    # DarkNet Feature Extractor uses (608, 608) image size
 SHRINK_FACTOR = 32     # How much image dimension has been reduced. **For DarkNet19 (max-pool 5 times) ** 2^5 = 32
-AUGMENT_LEVEL = 3      # The higher, the more data is augmented
+AUGMENT_LEVEL = 3      # The higher, the more data is augmented. Note: data generator might fail if aug_level > 15
 MULTI_SCALE   = [1.0]  # For Multi-scale training proposed in YOLO9000 - not working yet
 
 # Imagine Anchor as pre-define width/height based on ground truth to help network converge faster

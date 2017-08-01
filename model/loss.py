@@ -91,11 +91,11 @@ def custom_loss(y_true, y_pred):
     weight_coor = tf.concat(4 * [true_box_conf], 4)
     weight_coor = 5.0 * weight_coor
     weight = tf.concat([weight_coor], 4)
-    loss = tf.pow(y_pred - y_true, 2)
-    loss = loss * weight
-    loss = tf.reshape(loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
-    loss = tf.reduce_sum(loss, 1)
-    loss = tf.reduce_mean(loss)
+    coordinate_loss = tf.pow(y_pred - y_true, 2)
+    coordinate_loss = coordinate_loss * weight
+    coordinate_loss = tf.reshape(coordinate_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
+    coordinate_loss = tf.reduce_sum(coordinate_loss, 1)
+    coordinate_loss = tf.reduce_mean(coordinate_loss)
 
     # Object Confidence loss
     weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
@@ -105,16 +105,14 @@ def custom_loss(y_true, y_pred):
     conf_loss = tf.reduce_mean(conf_loss)
 
     # Object probability Loss
-    weight_prob = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
-    pred_probs = (pred_conf * pred_prob) * weight_prob    # Object probability = Objectiveness * IoU * Clf_probs
     # @TODO: soft-max hierarchical tree
-    probs_loss = HIER_TREE.calculate_softmax(idx=-1, logits=pred_probs, labels=true_box_prob)
-    # cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=pred_probs, labels=true_box_prob)
-    # probs_loss = tf.reduce_mean(cross_entropy)
+    weight_prob = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
+    pred_probs  = pred_prob * weight_prob
+    probs_loss = HIER_TREE.calculate_softmax(idx=-1, logits=pred_probs, labels=true_box_prob, obj_conf=pred_conf)
 
     # Total loss
-    loss = 0.5 * (loss + conf_loss + probs_loss)
-    return loss
+    total_loss = 0.5 * (coordinate_loss + conf_loss + probs_loss)
+    return total_loss
 
 
 def _create_offset_map(output_shape):

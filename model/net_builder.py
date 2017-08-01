@@ -85,10 +85,10 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
                         strides=strides, use_bias=False,
                         name='conv_dw_%d' % block_id)(inputs)
     x = BatchNormalization(axis=channel_axis, name='conv_dw_%d_bn' % block_id)(x)
-    x = Activation(relu6, name='conv_dw_%d_relu' % block_id)(x)
+    x = LeakyReLU(alpha=0.1, name='conv_dw_%d_leakyrelu' % block_id)(x)
 
     x = Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1),
                name='conv_pw_%d' % block_id)(x)
     x = BatchNormalization(axis=channel_axis, name='conv_pw_%d_bn' % block_id)(x)
 
-    return Activation(relu6, name='conv_pw_%d_relu' % block_id)(x)
+    return LeakyReLU(alpha=0.1, name='conv_pw_%d_relu' % block_id)(x)

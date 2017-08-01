@@ -57,7 +57,7 @@ from __future__ import division
 
 import warnings
 import numpy as np
-
+from cfg import *
 from keras.preprocessing import image
 
 from keras.models import Model
@@ -383,7 +383,7 @@ def MobileNet(input_shape=None,
 
     # Determine proper input shape.
     input_shape = _obtain_input_shape(input_shape,
-                                      default_size=608,
+                                      default_size=IMG_INPUT,
                                       min_size=32,
                                       data_format=K.image_data_format(),
                                       include_top=include_top or weights)
@@ -391,8 +391,7 @@ def MobileNet(input_shape=None,
         row_axis, col_axis = (0, 1)
     else:
         row_axis, col_axis = (1, 2)
-    rows = input_shape[row_axis]
-    cols = input_shape[col_axis]
+    rows = 224
 
     if weights == 'imagenet':
         if depth_multiplier != 1:
@@ -403,12 +402,6 @@ def MobileNet(input_shape=None,
             raise ValueError('If imagenet weights are being loaded, '
                              'alpha can be one of'
                              '`0.25`, `0.50`, `0.75` or `1.0` only.')
-
-        if rows != cols or rows not in [128, 160, 192, 224]:
-            raise ValueError('If imagenet weights are being loaded, '
-                             'input must have a static square shape (one of '
-                             '(128,128), (160,160), (192,192), or (224, 224)).'
-                             ' Input shape provided = %s' % (input_shape,))
 
     if K.image_data_format() != 'channels_last':
         warnings.warn('The MobileNet family of models is only available '
