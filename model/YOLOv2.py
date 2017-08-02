@@ -110,11 +110,21 @@ class YOLOv2(object):
         boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
 
         # @TODO different level of soft-max
-        tmp = box_confidence * box_class_probs
-        box_scores = K.softmax(tmp[..., 0:0+5])
-        # if mode == 0:
-        #     box_scores = box_confidence
-        # box_scores = K.softmax(tmp)
+        if mode == 0:
+            # Only get the first level of the soft max tree
+            box_scores = box_confidence
+        if mode == 1:
+            id = HIER_TREE.tree_dict[-1].children[0].id
+            box_scores = box_confidence * K.softmax(box_class_probs[..., id:id + len(HIER_TREE.tree_dict[-1].children)])
+        if mode == 2:
+            scores = []
+            id = HIER_TREE.tree_dict[-1].children[0].id
+            parent_scores = box_confidence * K.softmax(box_class_probs[..., id:id + len(HIER_TREE.tree_dict[-1].children)])
+            for node in HIER_TREE.tree_dict[-1].children:
+                id = node.children[0].id
+                scores.append(parent_scores[..., node.id: node.id + 1] * K.softmax(
+                    box_class_probs[..., id: id + len(node.children)]))
+            box_scores = tf.concat(scores, axis=4)
 
         box_classes      = K.argmax(box_scores, -1)
         box_class_scores = K.max(box_scores, -1)
@@ -141,6 +151,11 @@ class YOLOv2(object):
         boxes_prediction = boxes.eval()
         scores_prediction = scores.eval()
         classes_prediction = classes.eval()
+
+        if mode == 0:
+            classes_prediction -= 1
+        if mode == 2:
+            classes_prediction += len(HIER_TREE.tree_dict[-1].children)
 
         return boxes_prediction, scores_prediction, classes_prediction
 

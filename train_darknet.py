@@ -19,8 +19,10 @@ from keras.callbacks import LearningRateScheduler
 
 from cfg import *
 from sklearn.utils import shuffle
+from sklearn.model_selection import train_test_split
 from utils.parse_txt_to_inputs import parse_txt_to_inputs    # Data handler for LISA dataset
 from utils.data_generator import flow_from_list
+
 
 from model.darknet19 import darknet19
 from model.YOLOv2 import YOLOv2
@@ -47,35 +49,27 @@ FEATURE_EXTRACTOR_WEIGHTS = args.feature_extractor_weights
 K.clear_session()  # Avoid duplicate model
 
 
-def learning_rate_schedule(epochs):
-    if epochs < 60:
-        return LEARNING_RATE
-    if 60 <= epochs < 90:
-        return LEARNING_RATE / 10.
-    if 90 <= epochs < 140:
-        return LEARNING_RATE / 100.
-    if epochs >= 140:
-        return LEARNING_RATE / 1000.
-
-
 def _main_():
     # Load data
     x_train, y_train = parse_txt_to_inputs(annotation_path)
-
     # Build Model
     darknet  = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3), pretrained_weights=FEATURE_EXTRACTOR_WEIGHTS)
     yolov2   = YOLOv2(feature_extractor=darknet, num_anchors=N_ANCHORS, num_classes=N_CLASSES, fine_grain_layer=['leaky_re_lu_13'])
+    # Build Model
 
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
-        yolov2.model.load_weights(WEIGHTS_FILE)
+        yolov2.model.load_weights(WEIGHTS_FILE, by_name=True)
 
     for layer in darknet.layers:
         layer.trainable = False
     yolov2.model.summary()
 
     # Construct Data Generator
-    train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
+    x, y = shuffle(x_train, y_train)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=False)
+    val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
@@ -86,10 +80,10 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=50, #len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=int(len(x_train)*0.1/BATCH_SIZE),
-                               epochs=EPOCHS, initial_epoch=70,
+                               validation_steps=10 , #int(len(x_train)*0.1/BATCH_SIZE),
+                               epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=3, verbose=1)
 
@@ -121,9 +115,19 @@ def setup_debugger(yolov2):
     lr_scheduler = LearningRateScheduler(learning_rate_schedule)
     return tf_board, lr_scheduler, backup_model
 
+
+def learning_rate_schedule(epochs):
+    if epochs < 60:
+        return LEARNING_RATE
+    if 60 <= epochs < 90:
+        return LEARNING_RATE / 10.
+    if 90 <= epochs < 140:
+        return LEARNING_RATE / 100.
+    if epochs >= 140:
+        return LEARNING_RATE / 1000.
+
 if __name__ == "__main__":
     _main_()
-
     # # OVER-FIT ON FEW EXAMPLES
     # len = 8
     # x_train, y_train = shuffle(x_train, y_train)

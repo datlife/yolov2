@@ -33,9 +33,9 @@ class MobileYolo(object):
         :param num_classes: int 
                    - number of classes in training data
         """
-        self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout)
+        self.model = self._construct_yolov2(feature_extractor, num_anchors, num_classes, fine_grain_layer)
 
-    def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer, dropout=None):
+    def _construct_yolov2(self, feature_extractor, num_anchors, num_classes, fine_grain_layer):
         """
         Build YOLOv2 Model
 
@@ -46,21 +46,22 @@ class MobileYolo(object):
         fine_grained2 = feature_extractor.get_layer(name=fine_grain_layer[1]).output
 
         feature_map = feature_extractor.output
-        x = Dropout(rate=dropout)(feature_map)
-        x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=14)
+        x = _depthwise_conv_block(feature_map, 1024, 1.0, 1, block_id=14)
         x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=15)
-        x = Dropout(rate=dropout)(x)
 
         res_layer = conv_block(fine_grained, 64, (1, 1))
         res_layer2 = conv_block(fine_grained2, 128, (1, 1))
-        reshaped = Lambda(space_to_depth_x2, space_to_depth_x2_output_shape, name='space_to_depth')(res_layer)
-        reshaped2 = Lambda(space_to_depth_x4, space_to_depth_x4_output_shape, name='space_to_depth2')(res_layer2)
+        reshaped = Lambda(space_to_depth_x2,
+                          space_to_depth_x2_output_shape,
+                          name='space_to_depth')(res_layer)
+
+        reshaped2 = Lambda(space_to_depth_x4,
+                           space_to_depth_x4_output_shape,
+                           name='space_to_depth2')(res_layer2)
         x = concatenate([reshaped2, reshaped, x])
-        x = Dropout(rate=dropout)(x)
 
         x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=16)
         x = _depthwise_conv_block(x, 1024, 1.0, 1, block_id=17)
-        x = Dropout(rate=Dropout)(x)
 
         detector = Conv2D(filters=(num_anchors * (num_classes + 5)),
                           kernel_size=(1, 1), kernel_regularizer=l2(5e-4))(x)
@@ -87,6 +88,7 @@ class MobileYolo(object):
 
         GRID_H, GRID_W = prediction.shape[1:3]
 
+        image_shape = img.shape
         # Create GRID-cell map
         cx = tf.cast((K.arange(0, stop=GRID_W)), dtype=tf.float32)
         cx = K.tile(cx, [GRID_H])
@@ -107,7 +109,7 @@ class MobileYolo(object):
         box_xy          = K.sigmoid(prediction[..., :2])
         box_wh          = K.exp(prediction[..., 2:4])
         box_confidence  = K.sigmoid(prediction[..., 4:5])
-        box_class_probs = prediction[..., 5:]
+        box_class_probs = K.softmax(prediction[..., 5:])
 
         # Shift center points to its grid cell accordingly (Ref: YOLO-9000 loss function)
         box_xy    = (box_xy + c_xy) / netout_size
@@ -119,28 +121,38 @@ class MobileYolo(object):
         boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
 
         # @TODO different level of soft-max
-        tmp = box_confidence * box_class_probs
-        box_scores = K.softmax(tmp[..., 0:0+5])
-        # if mode == 0:
-        #     box_scores = box_confidence
-        # box_scores = K.softmax(tmp)
+        if mode == 0:
+            # Only get the first level of the soft max tree
+            box_scores  = box_confidence
+        if mode == 1:
+            id = HIER_TREE.tree_dict[-1].children[0].id
+            box_scores = box_confidence * K.softmax(box_class_probs[..., id:id + len(HIER_TREE.tree_dict[-1].children)])
+        if mode == 2:
+            scores = []
+            id = HIER_TREE.tree_dict[-1].children[0].id
+            parent_scores = box_confidence * K.softmax(box_class_probs[..., id:id + len(HIER_TREE.tree_dict[-1].children)])
+            for node in HIER_TREE.tree_dict[-1].children:
+                id = node.children[0].id
+                scores.append(parent_scores[..., node.id: node.id + 1] * K.softmax(box_class_probs[..., id: id + len(node.children)]))
+            box_scores = tf.concat(scores, axis=4)
 
-        box_classes      = K.argmax(box_scores, -1)
+        box_classes = K.argmax(box_scores, -1)
         box_class_scores = K.max(box_scores, -1)
-        prediction_mask  = (box_class_scores >= score_threshold)
+        prediction_mask = (box_class_scores >= score_threshold)
 
         boxes = tf.boolean_mask(boxes, prediction_mask)
         scores = tf.boolean_mask(box_class_scores, prediction_mask)
         classes = tf.boolean_mask(box_classes, prediction_mask)
 
         # Scale boxes back to original image shape.
-        height, width, _ = img.shape
+        height = image_shape[0]
+        width = image_shape[1]
 
         image_dims = tf.cast(K.stack([height, width, height, width]), tf.float32)
         image_dims = K.reshape(image_dims, [1, 4])
         boxes = boxes * image_dims
 
-        nms_index = tf.image.non_max_suppression(boxes, scores, tf.Variable(10), iou_threshold=iou_threshold)
+        nms_index = tf.image.non_max_suppression(boxes, scores, tf.Variable(20), iou_threshold=iou_threshold)
         boxes   = K.gather(boxes, nms_index)
         scores  = K.gather(scores, nms_index)
         classes = K.gather(classes, nms_index)
