@@ -74,18 +74,18 @@ def _main_():
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
-    adam = keras.optimizers.Adam(LEARNING_RATE, clipvalue=3.0)
+    adam = keras.optimizers.Adam(LEARNING_RATE)
     yolov2.model.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=50, #len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=int(len(x_train)/BATCH_SIZE),
                                validation_data=val_data_gen,
-                               validation_steps=10 , #int(len(x_train)*0.1/BATCH_SIZE),
+                               validation_steps=int(len(x_test)/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=3, verbose=1)
+                               workers=4, verbose=1)
 
     yolov2.model.save_weights('yolov2.weights')
 

@@ -14,7 +14,7 @@ from utils.draw_boxes import Box, draw
 K.clear_session()  # to avoid duplicating model
 
 WEIGHTS_PATH = './yolov2.weights'
-MODE         = 2
+MODE         = 1
 IOU_THRESH   = 0.5
 SCORE_THRESH = 0.5
 # Map int to label
@@ -41,7 +41,7 @@ def _main_():
             orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
             orig_size = orig_img.shape
             img = cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT))
-            boxes_prediction, scores_prediction, classes_prediction = yolov2.predict(img, iou_threshold=0.5, score_threshold=0.4, mode=MODE)
+            boxes_prediction, scores_prediction, classes_prediction = yolov2.predict(img, iou_threshold=0.5, score_threshold=0.6, mode=MODE)
             bboxes = []
             # Create a list of  bounding boxes in original image size
             for box, score, cls in zip(boxes_prediction, scores_prediction, classes_prediction):
@@ -54,7 +54,7 @@ def _main_():
                 bboxes.append(Box(x1, y1, x2, y2, obj, score))
 
             result = draw(orig_img, bboxes)
-            result.save("./evalutation/"+img_path.split('/')[-1])
+            result.save("./evaluation/"+img_path.split('/')[-1])
 
 
 if __name__ == "__main__":
