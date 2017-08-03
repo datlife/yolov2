@@ -22,7 +22,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from utils.parse_txt_to_inputs import parse_txt_to_inputs    # Data handler for LISA dataset
 from utils.data_generator import flow_from_list
-
+from utils.multi_gpu import get_gpus, make_parallel
 
 from model.darknet19 import darknet19
 from model.YOLOv2 import YOLOv2
@@ -33,7 +33,7 @@ parser = ArgumentParser(description="Train YOLOv2")
 parser.add_argument('-p', '--path', help="Path to training data set (e.g. /dataset/lisa/ ", type=str,  default='training.txt')
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
-parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=8)
+parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=4)
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='/media/sharedHDD/yolo_model/')
 parser.add_argument('--feature_extractor_weights', help="Path to feature extractor pre-trained weights", type=str, default=None)
@@ -65,27 +65,34 @@ def _main_():
         layer.trainable = False
     yolov2.model.summary()
 
-    # Construct Data Generator
-    x, y = shuffle(x_train, y_train)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
-    train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=False)
-    val_data_gen = flow_from_list(x_test, y_test, batch_size=BATCH_SIZE, augment_data=False)
-
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
+    # Update Multiple GPUS- training
+    gpus = get_gpus()
+    if gpus > 1:
+        model = make_parallel(yolov2.model, gpus)
+        batch = gpus*BATCH_SIZE
+        print("Multiple GPUs training is enabled")
+
     adam = keras.optimizers.Adam(LEARNING_RATE)
-    yolov2.model.compile(optimizer=adam, loss=custom_loss)
+    model.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
+    # Construct Data Generator
+    x, y = shuffle(x_train, y_train)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    train_data_gen = flow_from_list(x_train, y_train, batch_size=batch, augment_data=False)
+    val_data_gen = flow_from_list(x_test, y_test, batch_size=batch, augment_data=False)
+
     print("Starting training process\n")
-    yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=int(len(x_train)/BATCH_SIZE),
-                               validation_data=val_data_gen,
-                               validation_steps=int(len(x_test)/BATCH_SIZE),
-                               epochs=EPOCHS, initial_epoch=0,
-                               callbacks=[tf_board, lr_scheduler, backup_model],
-                               workers=4, verbose=1)
+    model.fit_generator(generator=train_data_gen,
+                        steps_per_epoch=int(len(x_train)/BATCH_SIZE),
+                        validation_data=val_data_gen,
+                        validation_steps=int(len(x_test)/BATCH_SIZE),
+                        epochs=EPOCHS, initial_epoch=0,
+                        callbacks=[tf_board, lr_scheduler, backup_model],
+                        workers=3, verbose=1)
 
     yolov2.model.save_weights('yolov2.weights')
 

@@ -70,7 +70,7 @@ def _main_():
     # Construct Data Generator
     # train_data_gen, val_data_gen = create_data_generator(x_train, y_train)
     # # OVER-FIT ON FEW EXAMPLES
-    len = 16
+    len = 4
     x_train, y_train = shuffle(x_train, y_train)
     x_train = np.tile(x_train[0:len], 4).tolist()
     y_train  = np.tile(y_train[0:len], [4, 1])
@@ -81,18 +81,19 @@ def _main_():
 
     train_data_gen = flow_from_list(x_train, y_train, batch_size=BATCH_SIZE, augment_data=False)
     val_data_gen = flow_from_list(x_train, y_train,   batch_size=BATCH_SIZE, augment_data=False)
+
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
-    adam = keras.optimizers.Adam(LEARNING_RATE, clipvalue=3.0)
+    adam = keras.optimizers.Adam(LEARNING_RATE)
     yolov2.model.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
     print("Starting training process\n")
     yolov2.model.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=50, #len(x_train)/BATCH_SIZE,
+                               steps_per_epoch=100,   # len(x_train)/BATCH_SIZE,
                                validation_data=val_data_gen,
-                               validation_steps=10 , #int(len(x_train)*0.1/BATCH_SIZE),
+                               validation_steps=10,  # int(len(x_train)*0.1/BATCH_SIZE),
                                epochs=EPOCHS, initial_epoch=0,
                                callbacks=[tf_board, lr_scheduler, backup_model],
                                workers=3, verbose=1)
