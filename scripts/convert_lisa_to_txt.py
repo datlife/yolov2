@@ -4,7 +4,6 @@ Convert LISA csv annotation data set to txt format as following:
 Text file Format:
 ---------
 abs_image_path, x1, y1, x2, y2, label
-
 Usage:
 -----
 python process_lisa.py -p ../lisa/training
@@ -19,12 +18,11 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Convert LISA Annotation into text file")
 parser.add_argument('--path', '-p', type=str, help='path to training/testing lisa dataset')
-parser.add_argument('--output', '-o', type=str, default='training.txt', help='Output file name')
+parser.add_argument('--output_filename', '-o', type=str, default='training.txt', help='Output file name')
 
 args = parser.parse_args()
 lisa_path = args.path
-out_fname = args.output
-
+out_fname = args.output_filename
 
 
 def _main_():
@@ -35,7 +33,16 @@ def _main_():
 def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     image_paths, labels = load_lisa_data(csv_path)
     df = pd.concat([image_paths, labels], axis=1)
-    np.savetxt(save_file, df.values, delimiter=',', fmt='%s')
+    data_file_path  = os.path.join(csv_path, save_file)
+    categories_path = os.path.join(csv_path, 'categories.txt')
+    # Save training data
+    np.savetxt(data_file_path, df.values, delimiter=',', fmt='%s')
+    print("A text file has been created at {}/{}".format(csv_path,  save_file))
+    # Save labels in to categories.txt
+    labels = df['Annotation tag'].unique()
+    np.savetxt(categories_path, labels, delimiter=',', fmt='%s')
+    print("A text file has been created at {}".format(categories_path))
+
     return image_paths, labels
 
 
@@ -79,9 +86,6 @@ def load_lisa_data(path=None):
     Y = pd.concat(Y)
     # Re-arrange order of pandas frame
     Y = Y[['Upper left corner X', 'Upper left corner Y', 'Lower right corner X', 'Lower right corner Y', 'Annotation tag']]
-
-    print("A text file has been created at {}/{}".format(path, out_fname))
-
     return X, Y
 
 if __name__ == "__main__":

@@ -1,79 +1,60 @@
-import cv2
 import numpy as np
-import math
+import cv2
+import copy
+from utils.box import Box
 
 
-def preprocess_img(img):
-    img = img/255.
-    # img -= 0.5
-    # img *= 2
-    return img
+def augment_img(img, objects):
+    aug_img      = np.copy(img)
+    copy_objects = copy.deepcopy(objects)
+    HEIGHT, WIDTH, c = img.shape
+    # scale the image
+    scale = np.random.uniform() / 10. + 1.
+    aug_img = cv2.resize(aug_img, (0, 0), fx=scale, fy=scale)
 
+    # translate the image
+    max_offx = (scale - 1.) * WIDTH
+    max_offy = (scale - 1.) * HEIGHT
+    offx = int(np.random.uniform() * max_offx)
+    offy = int(np.random.uniform() * max_offy)
+    aug_img = aug_img[offy: (offy + HEIGHT), offx: (offx + WIDTH)]
 
-def random_transform(img, bbox):
-    """
-    Augment image randomly
-    """
-    a = np.random.randint(0, 2, [1, 3]).astype('bool')[0]
-    aug_box = bbox
-    # if a[0] == 1:
-    #     img, aug_box = rotate(img, bbox)
-    if a[1] == 1:
-        img = blur(img)
-    # if a[2] == 1:
-    #     img = change_brightness(img)
-    # GAN can apply here to create random occlusion and deformation
+    # # Changing color
+    aug_img = change_brightness(aug_img)
 
-    return img, aug_box
+    # fix object's position and size
+    new_labels = []
+    for obj in copy_objects:
+        gt_box, gt_label = obj
+        xc, yc, w, h = gt_box.to_array()
+        xc = int(xc * scale - offx)
+        xc = max(min(xc, WIDTH), 0)
+        yc = int(yc * scale - offy)
+        yc = max(min(yc, HEIGHT), 0)
+        new_labels.append([Box(xc, yc, w*scale, h*scale), gt_label])
+
+    return aug_img, new_labels
 
 
 def change_brightness(image):
     image1 = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     image1 = np.array(image1, dtype=np.float64)
-    random_bright = .5+np.random.uniform()
+    random_bright = 0.5 + np.random.uniform()
     image1[:, :, 2] = image1[:, :, 2]*random_bright
     image1[:, :, 2][image1[:, :, 2] > 255]  = 255
+
     image1 = np.array(image1, dtype=np.uint8)
     image1 = cv2.cvtColor(image1, cv2.COLOR_HSV2RGB)
     return image1
 
 
-def blur(img):
-    r_int = np.random.randint(0, 2)
-    odd_size = 2 * r_int + 1
-    return cv2.GaussianBlur(img, (odd_size, odd_size), 0)
-
-
-def rotate(img, bbox=None):
+def random_crop_and_rescale(img, objects):
     """
-        Rotate original image at random rotation angle from -30 degree to +30 degree
-    :param img: 
-    :param bbox: 
-    :return: 
+
+    :param img:
+    :param objects:
+    :return:
     """
-    row, col, channel = img.shape
-    angle = np.random.uniform(-20, 20)
-    rotation_point = (row / 2, col / 2)
-    rotation_matrix = cv2.getRotationMatrix2D(rotation_point, angle, 1)
-    rotated_img = cv2.warpAffine(img, rotation_matrix, (col, row))
 
-    # Update bounding box
-    angle = angle * (np.pi / 180)
-    rotated_box =[]
-    for box in bbox:
-        for pts in box:
-            pts = np.asarray(pts, dtype=np.float)
-            x = pts[0]
-            y = pts[1]
-            axis_x = x - rotation_point[0]
-            axis_y = y - rotation_point[1]
-
-            x = axis_x * math.cos(angle) + axis_y * math.sin(angle)
-            y = (-axis_x) * math.sin(angle) + axis_y * math.cos(angle)
-            x = x + rotation_point[0]
-            y = y + rotation_point[1]
-            rotated_box.append(tuple(np.array([x, y])))
-    return rotated_img, [rotated_box]
-
-
-
+    # Look for all object
+    xmin

@@ -1,23 +1,16 @@
-import os
-import numpy as np
-from softmaxtree.Tree import SoftMaxTree
-file_path = os.path.dirname(os.path.abspath(__file__))
+IMG_INPUT  = 608
+N_CLASSES  = 31
+CATEGORIES = "./dataset/lisa_extension/categories.txt"
 
-N_ANCHORS     = 5      # Number of ANCHORS (in YOLO9000 paper, 5 was chosen for optimal speed/performance)
-N_CLASSES     = 61     # Number of classes
-CATEGORIES    = os.path.join(file_path, 'lisa.categories')  # Order is matter, be careful of extra spaces - No space is allowed
-HIER_TREE     = SoftMaxTree(tree_file=os.path.join(file_path, 'lisa.tree'))  # Hierarchical Soft-max Implementation
+N_ANCHORS  = 5
+ANCHORS = [(0.845506524725, 1.22186355311), (0.45064008354, 0.678599422442), (1.67509256517, 2.46035742496),
+           (0.623830460077, 0.919391367777), (1.13196569056, 1.66035474942)]
 
-# Optional
-IMG_INPUT     = 608    # DarkNet Feature Extractor uses (608, 608) image size
-SHRINK_FACTOR = 32     # How much image dimension has been reduced. **For DarkNet19 (max-pool 5 times) ** 2^5 = 32
-AUGMENT_LEVEL = 13     # The higher, the more data is augmented. Note: data generator might fail if aug_level > 15
-MULTI_SCALE   = [1.0]  # For Multi-scale training proposed in YOLO9000 - not working yet
+# For Combined LISA Dataset
+# ANCHORS     = [(1.2255253619, 2.0790172001), (0.88504653628, 1.46357817461), (0.629442321737, 1.07695834955),
+#                (1.85679560768, 3.06510868443), (0.426883396719, 0.751765360431)]
 
-# Imagine Anchor as pre-define width/height based on ground truth to help network converge faster
-ANCHORS       = np.array(((1.67509256517, 2.46035742496),
-                          (1.13196569056, 1.66035474942),
-                          (0.623830460077, 0.919391367777),
-                          (0.45064008354, 0.678599422442),
-                          (0.845506524725, 1.22186355311)))
+# For COCO Dataset
+# ANCHORS    = [(0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434), (7.88282, 3.52778), (9.77052, 9.16828)]
 
+SHRINK_FACTOR = 32

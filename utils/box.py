@@ -55,7 +55,7 @@ class Box(object):
         return np.array((self.x, self.y, self.w, self.h))
 
     def __str__(self):
-        return "{} {} {} {}".format(self.x, self.y, self.w, self.h)
+        return "{}, {}, {}, {}".format(self.x, self.y, self.w, self.h)
 
     def __repr__(self):
         return str(self)
@@ -100,13 +100,6 @@ def convert_bbox(x1, y1, x2, y2):
     return xc, yc, w, h
 
 
-def xywh_to_xyxy(xc, yc, w, h):
-    x1 = xc - w * 0.5
-    y1 = yc - h * 0.5
-    x2 = xc + w * 0.5
-    y2 = yc + h * 0.5
-    return x1, y1, x2, y2
-
 def scale_rel_box(img_size, box):
     """
     Scale bounding box relative to image size
@@ -123,17 +116,6 @@ def scale_rel_box(img_size, box):
 
 def build_box_from_pd(bbox):
     """
-    Image Coordinate
-    0
-    *------------------------------> x
-    |  Upper               |
-    |     *........        |
-    |     :   *   :        |
-    |     :.......*        |
-    |            Lower     |
-    |----------------------*
-    |
-    y
     :param bbox: a single panda data frames
     :return: 
     """
@@ -148,6 +130,8 @@ def build_box_from_pd(bbox):
 
 # # TEST CASE ##
 if __name__ == "__main__":
+    b1 = Box(1, 1, 3, 3)
+    b2 = Box(1, 1, 3, 3)
     b1 = Box(1, 1, 3, 3)
     b2 = Box(1, 1, 3, 3)
     print("Box Intersection: ", box_intersection(b1, b2))

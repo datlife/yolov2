@@ -1,31 +1,75 @@
-import PIL
-from model.loss import custom_loss
-from model.darknet19 import darknet19
-from model.MobileYolo import MobileYolo
-from cfg import *
-
-WEIGHTS = './yolov2.weights'
-
-class Interference():
-    def __init__(self, model):
-        """
-        :param keras_model:
-        """
-        self.model = model
-        self.model.compile(optimizer='adam', loss=custom_loss)
+import cv2
+import datetime
+from threading import Thread
 
 
+class WebcamVideoStream:
+    def __init__(self, src, width, height):
+        # initialize the video camera stream and read the first frame
+        # from the stream
+        self.stream = cv2.VideoCapture(src)
+        # self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        # self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        (self.grabbed, self.frame) = self.stream.read()
+
+        # initialize the variable used to indicate if the thread should
+        # be stopped
+        self.stopped = False
+
+    def start(self):
+        # start the thread to read frames from the video stream
+        Thread(target=self.update, args=()).start()
+        return self
+
+    def update(self):
+        # keep looping infinitely until the thread is stopped
+        while True:
+            # if the thread indicator variable is set, stop the thread
+            if self.stopped:
+                return
+
+            # otherwise, read the next frame from the stream
+            (self.grabbed, self.frame) = self.stream.read()
+
+    def read(self):
+        # return the frame most recently read
+        return self.frame
+
+    def stop(self):
+        # indicate that the thread should be stopped
+        self.stopped = True
+
+
+class FPS:
+    def __init__(self):
+        # store the start time, end time, and total number of frames
+        # that were examined between the start and end intervals
+        self._start = None
+        self._end = None
+        self._numFrames = 0
+
+    def start(self):
+        # start the timer
+        self._start = datetime.datetime.now()
+        return self
+
+    def stop(self):
+        # stop the timer
+        self._end = datetime.datetime.now()
+
+    def update(self):
+        # increment the total number of frames examined during the
+        # start and end intervals
+        self._numFrames += 1
+
+    def elapsed(self):
+        # return the total number of seconds between the start and
+        # end interval
+        return (self._end - self._start).total_seconds()
+
+    def fps(self):
+        # compute the (approximate) frames per second
+        return self._numFrames / self.elapsed()
 
 
 
-if __name__ == "__main__":
-    # Build Model
-    darknet    = darknet19(input_size=(IMG_INPUT, IMG_INPUT, 3))
-    yolov2     = MobileYolo(feature_extractor=darknet,num_anchors=N_ANCHORS,
-                            num_classes=N_CLASSES, fine_grain_layer=['leaky_re_lu_13', 'leaky_re_lu_8'])
-
-    yolov2.model.load_weights(WEIGHTS)
-
-    interference = Interference(yolov2.model)
-
-    while True:

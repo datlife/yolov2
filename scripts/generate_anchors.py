@@ -9,7 +9,6 @@ size (w, h) for K anchors (in YOLOv2, K = 5)
 
 * Display an ANCHORS parameter to screen. Copy this into `cfg.py` to help your network learn faster
 
-
 Requirements
 ------------
    1. One needs to have a training data in text format as [img_path, x1, x2, y1, y2, label]
@@ -27,6 +26,7 @@ from PIL import Image
 # Add relative path
 import os
 import sys
+import numpy as np
 module_path = os.path.abspath(os.path.join('..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -70,7 +70,8 @@ def __main__():
 
     # print result
     for anchor in anchors:
-        print("({}, {})".format(anchor.w, anchor.h))
+        print("({}, {}),".format(anchor.w, anchor.h))
+    print("Please copy above anchors to cfg.py to train on your own dataset.")
 
 
 def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
@@ -96,18 +97,18 @@ def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
 
 def run_k_mean(n_anchors, boxes, centroids):
     """
-    Perform K-mean clustering on training ground truth to generate anchors. 
+    Perform K-mean clustering on training ground truth to generate anchors.
     In the paper, authors argues that generating anchors through anchors would improve Recall of the network
 
-    NOTE: Euclidean distance produces larger errors for larger boxes. Therefore, YOLOv2 did not use Euclidean distance 
+    NOTE: Euclidean distance produces larger errors for larger boxes. Therefore, YOLOv2 did not use Euclidean distance
           to measure calculate loss. Instead, it uses the following formula:
 
                     d(box, centroid) = 1−IOU(box, centroid)
 
     :param n_anchors: K-value , number of desired anchors box
     :param boxes:      list of bounding box in format [x1, y1, w, h]
-    :param centroids: 
-    :return: 
+    :param centroids:
+    :return:
         new_centroids: set of new anchors
         groups:        wth?
         loss:          compared to current bboxes

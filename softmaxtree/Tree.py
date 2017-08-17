@@ -22,7 +22,6 @@ class Node(object):
         self.height   = height
 
     def __str__(self):
-        str = ""
         str = "%s - %s \n " % (self.id, self.name)
         for child in self.children:
             for i in range(0, self.height, 1):
@@ -66,7 +65,7 @@ class SoftMaxTree(object):
         Create a encoded binary vector for a class
             Example: SpeedLimit45 is a subset of SpeedLimit, which is a subset of Traffic Sign
 
-            TraffiSign       SpeedLimit    Speed45
+            TrafficSign       SpeedLimit    Speed45
         [0. 0. 1. 0. 0. 0. ... 1...... 0. ...1... 0. ...]
 
         args
@@ -120,9 +119,6 @@ class SoftMaxTree(object):
                 sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels, obj_conf=obj_conf)
                 loss += sub_loss
         return loss
-
-    def get_hierarchical_probabilities(self, prediction):
-        print("hello")
 
 # Test
 if __name__ == "__main__":
