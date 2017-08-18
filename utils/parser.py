@@ -1,11 +1,7 @@
-from utils.box import Box, convert_bbox
 import csv
-import numpy as np
-from cfg import CATEGORIES
 from itertools import islice
 
-with open(CATEGORIES, 'r') as fl:
-    CLASSES = np.array(fl.read().splitlines())
+from utils.box import Box, convert_bbox
 
 
 def parse_inputs(txt_file):
@@ -42,7 +38,7 @@ def parse_inputs(txt_file):
 
 # Test new parse input
 if __name__ == "__main__":
-    from split_dataset import split_data
+    from scripts.split_dataset import split_data
     training, testing = split_data('../training.txt', ratio=0.2)
     training_data = parse_inputs(training)
     import random

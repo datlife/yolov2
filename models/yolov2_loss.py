@@ -30,7 +30,7 @@ def custom_loss(y_true, y_pred):
             loss value
     """
     pred_shape = K.shape(y_pred)[1:3]
-    gt_shape = K.shape(y_true)                 # shape of ground truth value
+    gt_shape = K.shape(y_true)  # shape of ground truth value
     GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
     GRID_W = tf.cast(pred_shape[1], tf.int32)
 
@@ -41,24 +41,25 @@ def custom_loss(y_true, y_pred):
     # Grid Map to calculate offset
     c_xy = _create_offset_map(K.shape(y_pred))
 
+    # Scale anchors to correct aspect ratio
     # Extract prediction output from network
-    pred_xy   = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-    pred_wh   = (tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])) / output_size
-    pred_wh   = tf.sqrt(pred_wh)
-    pred_conf = tf.expand_dims(tf.sigmoid(y_pred[:, :, :, :, 4]), -1)
-    pred_cls  = y_pred[:, :, :, :, 5:]
+    pred_box_xy = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
+    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
+    pred_box_conf = tf.sigmoid(y_pred[:, :, :, :, 4:5])
+    pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
 
     # Adjust ground truth
-    true_box_xy = y_true[:, :, :, :, 0:2]
+    center_xy = y_true[:, :, :, :, 0:2]
+    true_box_xy = center_xy
     true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
 
     # adjust confidence
-    pred_tem_wh = tf.pow(pred_wh, 2) * output_size
+    pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
     pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
-    pred_box_ul = pred_xy - 0.5 * pred_tem_wh
-    pred_box_bd = pred_xy + 0.5 * pred_tem_wh
+    pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
+    pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
 
-    # Calculate IoU between prediction and ground truth
     true_tem_wh = tf.pow(true_box_wh, 2) * output_size
     true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
     true_box_ul = true_box_xy - 0.5 * true_tem_wh
@@ -76,32 +77,38 @@ def custom_loss(y_true, y_pred):
     true_box_conf = tf.expand_dims(best_box * y_true[:, :, :, :, 4], -1)
 
     # adjust confidence
-    pred_boxes = tf.concat([pred_xy, pred_wh], 4)
-    true_boxes = tf.concat([true_box_xy, true_box_wh], 4)
+    true_box_prob = y_true[:, :, :, :, 5:]
 
-    # Coordinate Loss
-    weight_coor     = 5.0 * tf.concat(4 * [true_box_conf], 4)
-    coordinate_loss = tf.pow(pred_boxes - true_boxes, 2) * weight_coor
-    coordinate_loss = tf.reshape(coordinate_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
-    coordinate_loss = tf.reduce_sum(coordinate_loss, 1)
-    coordinate_loss = tf.reduce_mean(coordinate_loss)
-
-    # Object Confidence loss
+    # Compute the weights
+    weight_coor = tf.concat(4 * [true_box_conf], 4)
+    weight_coor = 5.0 * weight_coor
     weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
-    conf_loss = tf.pow(true_box_conf - pred_conf, 2) * weight_conf
-    conf_loss = tf.reshape(conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 1])
-    conf_loss = tf.reduce_sum(conf_loss, 1)
-    conf_loss = tf.reduce_mean(conf_loss)
+    weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
+    weight_prob = 1.0 * weight_prob
+    weight = tf.concat([weight_coor, weight_conf, weight_prob], 4)
 
-    # Category probability Loss
-    weight_prob    = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
-    category_prob  = (pred_conf * pred_cls) * weight_prob
-    category_loss  = tf.nn.softmax_cross_entropy_with_logits(labels=y_true[..., 5:], logits=category_prob)
-    category_loss  = tf.reduce_mean(category_loss)
+    # Localization Loss
+    true_boxes = tf.concat([true_box_xy, true_box_wh], 4)
+    pred_boxes = tf.concat([pred_box_xy, pred_box_wh], 4)
+    loc_loss = tf.pow(true_boxes - pred_boxes, 2) * weight_coor
+    loc_loss = tf.reshape(loc_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
+    loc_loss = tf.reduce_mean(tf.reduce_sum(loc_loss, 1))
 
-    # Total loss
-    total_loss = 0.5 * (coordinate_loss + conf_loss + category_loss)
-    return total_loss
+    # Object Confidence Loss
+    obj_conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
+    obj_conf_loss = tf.reshape(obj_conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS])
+    obj_conf_loss = tf.reduce_mean(tf.reduce_sum(obj_conf_loss, 1))
+
+    # Category Loss
+    # NOTE: YOLOv2 does not use cross-entropy loss.
+    category_loss = tf.pow(true_box_prob - pred_box_prob, 2) * weight_prob
+    category_loss = tf.reshape(category_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * N_CLASSES])
+    category_loss = tf.reduce_mean(tf.reduce_sum(category_loss, 1))
+
+    # Finalize the loss
+    loss = 0.5 * (loc_loss + obj_conf_loss + category_loss)
+
+    return loss
 
 
 def _create_offset_map(output_shape):

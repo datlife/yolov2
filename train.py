@@ -11,37 +11,41 @@ Return
    A weight file `yolov2.weights` for evaluation
 
 """
-import random, os
-import keras
+import os
+import random
+from argparse import ArgumentParser
 
-from keras.callbacks import TensorBoard
-from keras.callbacks import LambdaCallback
+import keras
 from keras.callbacks import LearningRateScheduler
+from keras.callbacks import TensorBoard
 from keras.regularizers import l2
 
 from cfg import *
-from utils.parser import parse_inputs
-from utils.split_dataset import split_data
-from utils.data_generator import flow_from_list
-
 from models.yolov2 import YOLOv2
 from models.yolov2_loss import custom_loss
+from utils.data_generator import flow_from_list
+from utils.parser import parse_inputs
 
-from argparse import ArgumentParser
 parser = ArgumentParser(description="Train YOLOv2")
-parser.add_argument('-p', '--path', help="Path to training data set (e.g. /dataset/lisa/ ", type=str,  default='training.txt')
+parser.add_argument('-p', '--path', help="Path to training data set (e.g. /dataset/lisa/) ", type=str,
+                    default='training.txt')
+parser.add_argument('-v', '--val-path', help="Path to testing data set ", type=str, default='testing.txt')
+
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
+parser.add_argument('--start_epoch', help='Initial epoch (helpful for restart training)', type=int, default=0)
 parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=1)
 parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='./backup/')
 parser.add_argument('-lr','--learning_rate', type=float, default=0.000001)
 
 args = parser.parse_args()
-annotation_path = args.path
+training_path = args.path
+val_path = args.val_path
 WEIGHTS_FILE    = args.weights
 BATCH_SIZE      = args.batch
 EPOCHS          = args.epochs
 LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
+INITIAL_EPOCH = args.start_epoch
 BACK_UP_PATH    = args.backup
 
 
@@ -63,61 +67,48 @@ def _main_():
         print("A backup directory has been created")
 
     # Build Model
-    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS, kernel_regularizer=l2(5e-6))
+    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
+                    kernel_regularizer=l2(5e-7))
 
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
         yolov2.load_weights(WEIGHTS_FILE, by_name=True)
-
+    # #
+    for layer in yolov2.layers[:-22]:
+        layer.trainable = False
     yolov2.summary()
 
     # Read training input
     # training, testing = split_data(annotation_path, ratio=0.1)
-    data = parse_inputs(annotation_path)
-    # validation_dict = parse_inputs('./data/testing_data.csv')
+    data = parse_inputs(training_path)
+    validation_dict = parse_inputs(val_path)
 
     # Shuffle and load training data into a dictionary [dict[image_path] = list of objects in that image]
     shuffled_keys = random.sample(data.keys(), len(data.keys()))
     training_dict = dict([(key, data[key]) for key in shuffled_keys])
-    training_dict = dict(training_dict.items()[0:20])
-    with open("test_images.csv", "wb") as csv_file:
-        fieldnames = ['Filename', 'annotation tag', 'x1','y1', 'x2', 'y2']
-        import csv
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        for fname in training_dict:
-            gts = training_dict[fname]
-            for gt in gts:
-                box, label = gt
-                xc, yc, w, h = box.to_array()
-                x1 = xc - 0.5*w
-                y1 = yc - 0.5*h
-                x2 = xc + 0.5*w
-                y2 = yc + 0.5*h
-                box = "%s, %s, %s, %s"%(x1, y1, x2, y2)
-                writer.writerow({'Filename': fname, 'annotation tag': label,
-                                 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2})
-                print("{}, {}, {}\n".format(fname, box, label))
+
     # Construct Data Generator
-    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=False)
-    # val_data_gen   = flow_from_list(validation_dict, batch_size=BATCH_SIZE)
+    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
+    val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
     sgd  = keras.optimizers.SGD(lr=LEARNING_RATE, momentum=0.9, decay=0.0005)
-    yolov2.compile(optimizer=sgd, loss=custom_loss)
+    adam = keras.optimizers.Adam(lr=LEARNING_RATE)
+    yolov2.compile(optimizer=adam, loss=custom_loss)
 
     # Start training here
     print("Starting training process\n")
-    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "SGD", "5e-6"))
+    print(
+    "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-7"))
     yolov2.fit_generator(generator=train_data_gen,
-                         steps_per_epoch=20*int(len(training_dict)/BATCH_SIZE),
-                         # validation_data=val_data_gen,
-                         # validation_steps=int(len(validation_dict)/BATCH_SIZE),
-                         epochs=EPOCHS, initial_epoch=0,
-                         callbacks=[tf_board, lr_scheduler],
+                         steps_per_epoch=int(len(training_dict) / BATCH_SIZE),
+                         validation_data=val_data_gen,
+                         validation_steps=int(len(validation_dict) / BATCH_SIZE),
+                         epochs=EPOCHS, initial_epoch=INITIAL_EPOCH,
+                         callbacks=[tf_board, backup_model],
                          workers=3, verbose=1)
-    print(training_dict)
 
     yolov2.save_weights('yolov2.weights')
 

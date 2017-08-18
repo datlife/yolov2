@@ -14,6 +14,7 @@ It will generates two things for every batch:
 """
 import os
 import cv2
+import random
 import pandas as pd
 import numpy as np
 import threading
@@ -27,6 +28,7 @@ from cfg import *
 with open(CATEGORIES, 'r') as fl:
     CLASSES = np.array(fl.read().splitlines())
     print(CLASSES)
+
 
 class threadsafe_iter:
     """Takes an iterator/generator and makes it thread-safe by
@@ -61,7 +63,6 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
     """
     slices   = int(len(training_instances)/batch_size)
     # Shuffle data
-    import random
     keys = training_instances.keys()
     shuffled_keys = random.sample(keys, len(keys))
 

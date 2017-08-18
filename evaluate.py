@@ -7,9 +7,14 @@ from utils.visualize import draw_bboxes
 from utils.draw_boxes import DrawingBox
 
 from cfg import *
-WEIGHTS    = 'overfit.weights'
-CLASS_PATH = './dataset/lisa_extension/categories.txt'
-TEST_DATA  = './dataset/testing_data.csv'
+from argparse import ArgumentParser
+
+parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
+parser.add_argument('-f', '--csv-file', help="Path to CSV file", type=str, default='./test_images.csv')
+parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
+parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", type=float, default=0.5)
+parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.7)
+
 ANCHORS    = np.asarray(ANCHORS).astype(np.float32)
 
 
@@ -19,9 +24,14 @@ def pre_process(img):
 
 
 def _main_():
+    args = parser.parse_args()
+    TEST_DATA = args.csv_file
+    WEIGHTS = args.weights
+    IOU = args.iou
+    THRESHOLD = args.threshold
 
     # Load class names
-    with open(CLASS_PATH, mode='r') as txt_file:
+    with open(CATEGORIES, mode='r') as txt_file:
         class_names = [c.strip() for c in txt_file.readlines()]
 
     # Load img path
@@ -46,7 +56,7 @@ def _main_():
 
             # Start prediction
             boxes, classes, scores = predict(yolov2, img, n_classes=N_CLASSES, anchors=ANCHORS,
-                                             iou_threshold=0.5, score_threshold=0.01)
+                                             iou_threshold=IOU, score_threshold=THRESHOLD)
 
             bboxes = []
             for box, cls, score in zip(boxes, classes, scores):

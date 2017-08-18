@@ -1,6 +1,6 @@
 IMG_INPUT  = 608
 N_CLASSES  = 31
-CATEGORIES = "./dataset/lisa_extension/categories.txt"
+CATEGORIES = "/home/dat/Documents/yolov2/dataset/lisa_extension/categories.txt"
 
 N_ANCHORS  = 5
 ANCHORS = [(0.845506524725, 1.22186355311), (0.45064008354, 0.678599422442), (1.67509256517, 2.46035742496),

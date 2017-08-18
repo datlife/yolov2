@@ -32,22 +32,25 @@ LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER L
 def _main_():
 
     # Build Model
-    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS, kernel_regularizer=None)
+    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
+                    kernel_regularizer=None)
 
-    # Load pre-trained file if one is available
+    # Load pre-trained weight if one is available
+    #
+    for layer in yolov2.layers[:-1]:
+        layer.trainable = False
+
     if WEIGHTS_FILE:
         yolov2.load_weights(WEIGHTS_FILE, by_name=True)
 
     yolov2.summary()
-
-    # Extract categories and
-    # Read training input
+    # Extract categories
     data = parse_inputs(annotation_path)
     shuffled_keys  = random.sample(data.keys(), len(data.keys()))
     training_dict  = dict([(key, data[key]) for key in shuffled_keys])
 
     # Create one instance for over-fitting model
-    training_dict = dict(training_dict.items()[0:20])
+    training_dict = dict(training_dict.items()[0:128])
     with open("test_images.csv", "wb") as csv_file:
         fieldnames = ['Filename', 'annotation tag', 'x1', 'y1', 'x2', 'y2']
         import csv
@@ -65,17 +68,48 @@ def _main_():
                 writer.writerow({'Filename': fname, 'annotation tag': label, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2})
                 print("{}, {}, {}\n".format(fname, box, label))
 
-    train_data_gen = flow_from_list(training_dict, batch_size=1)
-    sgd  = keras.optimizers.SGD(lr=LEARNING_RATE, momentum=0.9, decay=0.0005)
-    yolov2.compile(optimizer=sgd, loss=custom_loss)
     # Start training here
     print("Starting training process\n")
     print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "SGD", "None"))
 
-    yolov2.fit_generator(generator=train_data_gen, steps_per_epoch=100, epochs=EPOCHS, workers=3, verbose=1)
-    print(training_dict)
-    yolov2.save_weights('overfit.weights')
+    print("Stage 1 Training...Frozen all layers except last one")
+    model = yolov2
+    model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)
 
+    train_data_gen = flow_from_list(training_dict, batch_size=32)
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / 4, epochs=6, workers=3,
+                        verbose=1)
+    model.save_weights('stage1.weights')
+
+    print("Stage 2 Training...Full training")
+    for layer in yolov2.layers:
+        layer.trainable = True
+    yolov2.load_weights('stage1.weights')
+
+    model = yolov2
+    model.compile(keras.optimizers.Adam(lr=0.000003), loss=custom_loss)
+    train_data_gen = flow_from_list(training_dict, batch_size=4)
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict), epochs=EPOCHS, workers=3,
+                        verbose=1)
+
+    model.save_weights('overfit.weights')
 
 if __name__ == "__main__":
     _main_()
+
+    # with open("test_images.csv", "wb") as csv_file:
+    #     fieldnames = ['Filename', 'annotation tag', 'x1', 'y1', 'x2', 'y2']
+    #     import csv
+    #     writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+    #     for fname in training_dict:
+    #         gts = training_dict[fname]
+    #         for gt in gts:
+    #             box, label = gt
+    #             xc, yc, w, h = box.to_array()
+    #             x1 = xc - 0.5*w
+    #             y1 = yc - 0.5*h
+    #             x2 = xc + 0.5*w
+    #             y2 = yc + 0.5*h
+    #             box = "%s, %s, %s, %s"%(x1, y1, x2, y2)
+    #             writer.writerow({'Filename': fname, 'annotation tag': label, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2})
+    #             print("{}, {}, {}\n".format(fname, box, label))
