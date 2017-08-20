@@ -33,7 +33,7 @@ def _main_():
 
     # Build Model
     yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-                    kernel_regularizer=None)
+                    kernel_regularizer=keras.regularizers.l2(5e-7))
 
     # Load pre-trained weight if one is available
     #
@@ -76,18 +76,19 @@ def _main_():
     model = yolov2
     model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)
 
-    train_data_gen = flow_from_list(training_dict, batch_size=32)
-    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / 4, epochs=6, workers=3,
+    train_data_gen = flow_from_list(training_dict, batch_size=16)
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / 2, epochs=10, workers=3,
                         verbose=1)
     model.save_weights('stage1.weights')
 
     print("Stage 2 Training...Full training")
+
     for layer in yolov2.layers:
         layer.trainable = True
     yolov2.load_weights('stage1.weights')
 
     model = yolov2
-    model.compile(keras.optimizers.Adam(lr=0.000003), loss=custom_loss)
+    model.compile(keras.optimizers.Adam(lr=0.000002), loss=custom_loss)
     train_data_gen = flow_from_list(training_dict, batch_size=4)
     model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict), epochs=EPOCHS, workers=3,
                         verbose=1)

@@ -33,7 +33,7 @@ parser.add_argument('-v', '--val-path', help="Path to testing data set ", type=s
 
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-e', '--epochs',  help='Number of epochs for training', type=int, default=10)
-parser.add_argument('--start_epoch', help='Initial epoch (helpful for restart training)', type=int, default=0)
+parser.add_argument('-i', '--start_epoch', help='Initial epoch (helpful for restart training)', type=int, default=0)
 parser.add_argument('-b', '--batch',   help='Number of batch size', type=int, default=1)
 parser.add_argument('-s', '--backup',  help='Path to to backup model directory', type=str, default='./backup/')
 parser.add_argument('-lr','--learning_rate', type=float, default=0.000001)
@@ -70,14 +70,6 @@ def _main_():
     yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
                     kernel_regularizer=l2(5e-7))
 
-    # Load pre-trained file if one is available
-    if WEIGHTS_FILE:
-        yolov2.load_weights(WEIGHTS_FILE, by_name=True)
-    # #
-    for layer in yolov2.layers[:-22]:
-        layer.trainable = False
-    yolov2.summary()
-
     # Read training input
     # training, testing = split_data(annotation_path, ratio=0.1)
     data = parse_inputs(training_path)
@@ -88,20 +80,44 @@ def _main_():
     training_dict = dict([(key, data[key]) for key in shuffled_keys])
 
     # Construct Data Generator
-    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
     val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
 
     # for Debugging during training
     tf_board, lr_scheduler, backup_model = setup_debugger(yolov2)
 
-    sgd  = keras.optimizers.SGD(lr=LEARNING_RATE, momentum=0.9, decay=0.0005)
-    adam = keras.optimizers.Adam(lr=LEARNING_RATE)
-    yolov2.compile(optimizer=adam, loss=custom_loss)
-
     # Start training here
     print("Starting training process\n")
+
+    for layer in yolov2.layers[:-19]:
+        layer.trainable = False
+    yolov2.summary()
+    model = yolov2
+    # Load pre-trained file if one is available
+    if WEIGHTS_FILE:
+        model.load_weights(WEIGHTS_FILE)
+    train_data_gen = flow_from_list(training_dict, batch_size=16, augmentation=True)
+
+    print("Stage 1 Training...Frozen all layers except last one")
     print(
     "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-7"))
+
+    model.compile(optimizer=keras.optimizers.adam(lr=LEARNING_RATE), loss=custom_loss)
+    model.fit_generator(generator=train_data_gen,
+                        steps_per_epoch=int(len(training_dict) / 16),
+                        validation_data=val_data_gen,
+                        validation_steps=int(len(validation_dict) / BATCH_SIZE),
+                        callbacks=[tf_board, backup_model],
+                        epochs=200, initial_epoch=0, workers=3, verbose=1)
+    model.save_weights('stage1.weights')
+
+    for layer in yolov2.layers[:-6]:
+        layer.trainable = True
+    model = yolov2
+    model.load_weights('stage1.weights')
+    model.compile(keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
+    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
+
+    print("Stage 2 Training...Full training")
     yolov2.fit_generator(generator=train_data_gen,
                          steps_per_epoch=int(len(training_dict) / BATCH_SIZE),
                          validation_data=val_data_gen,

@@ -44,39 +44,35 @@ def custom_loss(y_true, y_pred):
     # Scale anchors to correct aspect ratio
     # Extract prediction output from network
     pred_box_xy = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2])
-    pred_box_wh = tf.sqrt(pred_box_wh / output_size)
+    pred_box_wh = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2]) / output_size
+    pred_box_wh = tf.sqrt(pred_box_wh)
     pred_box_conf = tf.sigmoid(y_pred[:, :, :, :, 4:5])
     pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
 
     # Adjust ground truth
-    center_xy = y_true[:, :, :, :, 0:2]
-    true_box_xy = center_xy
+    true_box_xy = y_true[:, :, :, :, 0:2]
     true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
 
     # adjust confidence
     pred_tem_wh = tf.pow(pred_box_wh, 2) * output_size
-    pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
     pred_box_ul = pred_box_xy - 0.5 * pred_tem_wh
     pred_box_bd = pred_box_xy + 0.5 * pred_tem_wh
+    pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
 
     true_tem_wh = tf.pow(true_box_wh, 2) * output_size
-    true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
     true_box_ul = true_box_xy - 0.5 * true_tem_wh
     true_box_bd = true_box_xy + 0.5 * true_tem_wh
+    true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
 
     intersect_ul = tf.maximum(pred_box_ul, true_box_ul)
     intersect_br = tf.minimum(pred_box_bd, true_box_bd)
-    intersect_wh = intersect_br - intersect_ul
-    intersect_wh = tf.maximum(intersect_wh, 0.0)
-    intersect_area = intersect_wh[:, :, :, :, 0] * intersect_wh[:, :, :, :, 1]
+    intersect_wh = tf.maximum(intersect_br - intersect_ul, 0.0)
+    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
 
     iou = tf.truediv(intersect_area, true_box_area + pred_box_area - intersect_area)
     best_box = tf.equal(iou, tf.reduce_max(iou, [3], True))
     best_box = tf.to_float(best_box)
     true_box_conf = tf.expand_dims(best_box * y_true[:, :, :, :, 4], -1)
-
-    # adjust confidence
     true_box_prob = y_true[:, :, :, :, 5:]
 
     # Compute the weights
@@ -85,7 +81,6 @@ def custom_loss(y_true, y_pred):
     weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
     weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
     weight_prob = 1.0 * weight_prob
-    weight = tf.concat([weight_coor, weight_conf, weight_prob], 4)
 
     # Localization Loss
     true_boxes = tf.concat([true_box_xy, true_box_wh], 4)

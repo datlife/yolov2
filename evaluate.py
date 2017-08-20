@@ -50,6 +50,9 @@ def _main_():
         # Load input
         for instance in testing_instances[1:]:
             img_path = instance[0]
+            import os
+            if not os.path.isfile(img_path):
+                continue
             orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
             height, width, _ = orig_img.shape
             img = pre_process(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
@@ -62,7 +65,7 @@ def _main_():
             for box, cls, score in zip(boxes, classes, scores):
                 y1, x1, y2, x2 = box * np.array(2 * [height / float(IMG_INPUT), width / float(IMG_INPUT)])
                 bboxes.append(DrawingBox(x1, y1, x2, y2, class_names[cls], score))
-                print("Found {} with {}%".format(class_names[cls], score))
+                print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
             # Save images to disk
             result = draw_bboxes(orig_img, bboxes)
             result.save('./evaluation/' + img_path.split('/')[-1])
