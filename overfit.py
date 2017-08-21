@@ -12,7 +12,6 @@ from models.yolov2 import YOLOv2
 from models.yolov2_loss import custom_loss
 
 from argparse import ArgumentParser
-
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
 parser.add_argument('-p', '--path',    help="Path to training text file ", type=str,  default='./dataset/lisa_extension/training.txt')
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
@@ -36,15 +35,9 @@ def _main_():
                     kernel_regularizer=keras.regularizers.l2(5e-7))
 
     # Load pre-trained weight if one is available
-    #
-    for layer in yolov2.layers[:-1]:
-        layer.trainable = False
-
     if WEIGHTS_FILE:
         yolov2.load_weights(WEIGHTS_FILE, by_name=True)
 
-    yolov2.summary()
-    # Extract categories
     data = parse_inputs(annotation_path)
     shuffled_keys  = random.sample(data.keys(), len(data.keys()))
     training_dict  = dict([(key, data[key]) for key in shuffled_keys])
@@ -71,7 +64,9 @@ def _main_():
     # Start training here
     print("Starting training process\n")
     print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "SGD", "None"))
-
+    for layer in yolov2.layers[:-1]:
+        layer.trainable = False
+    yolov2.summary()
     print("Stage 1 Training...Frozen all layers except last one")
     model = yolov2
     model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)

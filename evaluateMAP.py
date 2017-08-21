@@ -6,8 +6,13 @@ import sys
 import re
 from copy import deepcopy
 from collections import namedtuple
+from cfg import CATEGORIES
+import numpy as np
 
 MatchStats = namedtuple("MatchStats", ["numAnnotations", "tpCount", "fpCount", "precision", "recall", "widthsFound"])
+# Map int to label
+with open(CATEGORIES, 'r') as fl:
+    CLASSES = np.array(fl.read().splitlines())
 
 
 def computeMatchStatistics(annotations, detections, pascal=0.5, sizeMinimum=None):
@@ -23,6 +28,7 @@ def computeMatchStatistics(annotations, detections, pascal=0.5, sizeMinimum=None
                     sizeMinimum[1]):
             workAnnotations.remove(annotation)
             numAnnotations -= 1
+
     fpCount = 0
     tpCount = 0
     id = 0
@@ -36,18 +42,18 @@ def computeMatchStatistics(annotations, detections, pascal=0.5, sizeMinimum=None
             annFields = annotation.split(',')
 
             # Compute intersection : IoU
-            left = max(int(float(annFields[1])), int(float(fields[1])))
-            right = min(int(float(annFields[3])), int(float(fields[3])))
-            top = max(int(float(annFields[2])), int(float(fields[2])))
-            bottom = min(int(float(annFields[4])), int(float(fields[4])))
+            left = max(int(float(annFields[2])), int(float(fields[1])))
+            right = min(int(float(annFields[4])), int(float(fields[3])))
+            top = max(int(float(annFields[3])), int(float(fields[2])))
+            bottom = min(int(float(annFields[5])), int(float(fields[4])))
             if left < right and top < bottom:
                 intersectionArea = (right - left) * (bottom - top)
             else:
                 intersectionArea = 0
 
             # Compute union as the combined area of the two rectangles minus the intersection
-            unionArea = (int(float(annFields[3])) - int(float(annFields[1]))) * (
-                int(float(annFields[4])) - int(float(annFields[2]))) + \
+            unionArea = (int(float(annFields[4])) - int(float(annFields[2]))) * (
+                int(float(annFields[5])) - int(float(annFields[3]))) + \
                         (int(float(fields[3])) - int(float(fields[1]))) * (
                             int(float(fields[4])) - int(float(fields[2]))) - \
                         intersectionArea
@@ -68,7 +74,6 @@ def computeMatchStatistics(annotations, detections, pascal=0.5, sizeMinimum=None
         id += 1
 
         # @TODO: calculate mAP
-
     return [MatchStats(numAnnotations, tpCount, fpCount, tpCount / (tpCount + fpCount), tpCount / numAnnotations, []),
             # widthsFound),
             falsePositives,
@@ -89,11 +94,11 @@ def main(args):
     if not os.path.isfile(args.detectionPath):
         print("Error: The given detection file does not exist.")
         exit()
-    detectionFile = open(os.path.abspath(args.detectionPath), 'r')
-
     if not os.path.isfile(args.truthPath):
         print("Error: The given annotation file does not exist.")
         exit()
+
+    detectionFile = open(os.path.abspath(args.detectionPath), 'r')
     annotationFile = open(os.path.abspath(args.truthPath), 'r')
 
     if not (0 < args.pascal <= 1.0):
@@ -109,42 +114,50 @@ def main(args):
         sizeMinimum = [int(args.sizeMinimum.partition('x')[0]),
                        int(args.sizeMinimum.partition('x')[2])]
 
-    header = annotationFile.readline()  # Discard the header-line.
-
+    header = annotationFile.readline()  # Discard the header-line
     detections = detectionFile.readlines()
     annotations = annotationFile.readlines()
-    # from cfg import HIER_TREE
-    # for line in annotations:
-    #     line[1] = HIER_TREE.get_parent(line[1])
-    # print(annotations)
-    statistics, falsePositives, falseNegatives = computeMatchStatistics(annotations, detections, args.pascal,
-                                                                        sizeMinimum)
-
-    if args.printOnlyFalseNegatives:
-        printFalseNegatives(falseNegatives, header)
-        exit()
-    if args.verbose:
-        printDetailedStats(falsePositives, falseNegatives)
-
-    print('------')
-    print('Total Number of annotations:\t%d' % statistics.numAnnotations)
     print('------')
     print('Testing with a Pascal overlap measure of: %0.2f' % args.pascal)
-    print("True positives:\t\t%d" % statistics.tpCount)
-    print("False positives:\t%d" % statistics.fpCount)
-    print("False negatives (miss):\t%d" % (statistics.numAnnotations - statistics.tpCount))
     print('------')
-    print("Precision:\t\t%0.4f" % statistics.precision)
-    print("Recall:\t\t\t%0.4f" % statistics.recall)
+    ap_per_category = []
+    recall = []
+    for category in CLASSES:
+        prediction_annotations = [line for line in detections if line.split(',')[5].replace('\n', '') == category]
+        groundtruth_annotations = [line for line in annotations if line.split(',')[1] == category]
 
-    if args.widthHistogram and statistics.tpCount > 0:
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        n, bins, patches = ax.hist(statistics.widthsFound, range=(10, 110), bins=20)
-        ax.set_title('Histogram over detected bounding box widths in %s' % args.detectionPath)
-        plt.gca().set_xlabel("Sign widths in pixels")
-        plt.gca().set_ylabel("Number of detections")
-        plt.show()
+        if len(prediction_annotations) is 0 or len(groundtruth_annotations) is 0:
+            continue
+
+        statistics, falsePositives, falseNegatives = computeMatchStatistics(groundtruth_annotations,
+                                                                            prediction_annotations,
+                                                                            args.pascal, sizeMinimum)
+        if args.printOnlyFalseNegatives:
+            printFalseNegatives(falseNegatives, header)
+            exit()
+        if args.verbose:
+            printDetailedStats(falsePositives, falseNegatives)
+
+        print("Current Class : %s" % category)
+        print("-----------------------------\n")
+        print('Number of annotations:\t%d' % statistics.numAnnotations)
+        print("Precision:\t\t%0.4f" % statistics.precision)
+        print("Recall:\t\t\t%0.4f\n" % statistics.recall)
+
+        ap_per_category.append(statistics.precision)
+        recall.append(statistics.recall)
+        if args.widthHistogram and statistics.tpCount > 0:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            n, bins, patches = ax.hist(statistics.widthsFound, range=(10, 110), bins=20)
+            ax.set_title('Histogram over detected bounding box widths in %s' % args.detectionPath)
+            plt.gca().set_xlabel("Sign widths in pixels")
+            plt.gca().set_ylabel("Number of detections")
+    mAp = np.mean(np.array(ap_per_category))
+    mRecall = np.mean(np.array(recall))
+    print("mAp is : %f" % mAp)
+    print("Average Recall is : %f" % mRecall)
+    plt.show()
 
 
 if __name__ == "__main__":

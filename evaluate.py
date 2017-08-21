@@ -1,9 +1,10 @@
 import os
 import cv2
 import csv
+import time
 import numpy as np
 import tensorflow as tf
-
+import keras.backend as K
 from cfg import *
 from models.yolov2 import YOLOv2
 from models.predict import predict
@@ -39,45 +40,59 @@ def _main_():
     with open(TEST_DATA, 'rb') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
         for row in reader:
-            print(row)
+            # print(row)
             testing_instances.append(row)
 
     with tf.Session() as sess:
         yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
         yolov2.load_weights(WEIGHTS)
 
+        img_shape = K.placeholder(shape=(2,))
+        # Start prediction
+        boxes, classes, scores = predict(yolov2, img_shape,
+                                         n_classes=N_CLASSES,
+                                         anchors=ANCHORS,
+                                         iou_threshold=IOU,
+                                         score_threshold=THRESHOLD)
+
         with open("detections.csv", "wb") as csv_file:
             fieldnames = ['Filename', 'x1', 'y1', 'x2', 'y2', 'annotation tag', 'probabilities']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
             for instance in testing_instances[1:]:
                 img_path = instance[0]
                 if not os.path.isfile(img_path):
                     continue
+                start = time.time()
+
                 orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
                 height, width, _ = orig_img.shape
                 img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
-
-                # Start prediction
-                boxes, classes, scores = predict(yolov2, img,
-                                                 n_classes=N_CLASSES,
-                                                 anchors=ANCHORS,
-                                                 iou_threshold=IOU,
-                                                 score_threshold=THRESHOLD)
-
+                img = np.expand_dims(img, 0)
+                pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
+                                                                  feed_dict={
+                                                                      yolov2.input: img,
+                                                                      img_shape: [height, width],
+                                                                      K.learning_phase(): 0
+                                                                  })
+                end = time.time()
                 bboxes = []
-                for box, cls, score in zip(boxes, classes, scores):
-                    y1, x1, y2, x2 = box * np.array(2 * [height / float(IMG_INPUT), width / float(IMG_INPUT)])
+                for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
+                    y1, x1, y2, x2 = box
                     bboxes.append(DrawingBox(x1, y1, x2, y2, class_names[cls], score))
-                    print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
+                    # print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
                     writer.writerow({'Filename': img_path,
                                      'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                      'annotation tag': class_names[cls],
                                      'probabilities': score})
+                end2 = time.time()
                 # Save image to evaluation dir
                 if OUTPUT is not None:
                     result = draw_bboxes(orig_img, bboxes)
                     result.save('./evaluation/' + img_path.split('/')[-1])
-
+                finish = time.time()
+                print(
+                "Prediction {} || Boxes {} || Written to images {}".format(end - start, end2 - end, finish - end2))
                 del orig_img, img, bboxes
 
 if __name__ == "__main__":

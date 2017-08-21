@@ -87,7 +87,7 @@ def _main_():
     train_data_gen = flow_from_list(training_dict, batch_size=16, augmentation=True)
 
     print("Stage 1 Training...Frozen all layers except last one")
-    model.compile(optimizer=keras.optimizers.adam(lr=0.000003), loss=custom_loss)
+    model.compile(optimizer=keras.optimizers.adam(lr=0.000001), loss=custom_loss)
     model.fit_generator(generator=train_data_gen,
                         steps_per_epoch=int(len(training_dict) / 16),
                         validation_data=val_data_gen,
