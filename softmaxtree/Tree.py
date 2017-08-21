@@ -8,6 +8,7 @@ lisa.tree
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
+from cfg import N_CLASSES, N_ANCHORS
 # Show a structure of a tree
 # Each node has the following [name, parent] - index is inferred from the order of this list
 
@@ -42,11 +43,13 @@ class SoftMaxTree(object):
         self.is_built = False
         try:
             lines = [l for l in fl.read().splitlines() if l is not '']  # Filter empty line and comment
+
             # Create a root node
             root_name = lines[0].split(',')[0]
-            self.tree_dict[-1] = Node(id=-1, node_name=root_name,  parent=None)
+            self.tree_dict[0] = Node(id=0, node_name=root_name, parent=None)
 
             for idx, line in enumerate(lines[1:]):
+                idx = idx + 1
                 name, parent_id = ["".join(s.split()) for s in line.split(',')]  # strip all whitespaces
                 height   = self.tree_dict[int(parent_id)].height + 1
 
@@ -83,7 +86,7 @@ class SoftMaxTree(object):
         encoded_label[parent_id] = 1.0
         return encoded_label
 
-    def calculate_softmax(self, idx, logits, labels, obj_conf):
+    def calculate_softmax(self, idx, logits, labels):
         """
         Update Probabilities of each labels accordingly to Hierarchical Structure
         :param idx:   default = -1 / starting from root of soft-max tree
@@ -92,35 +95,31 @@ class SoftMaxTree(object):
         :return:
         """
         loss = 0.0
-        if self.tree_dict[idx].children:   # traverse until reaching the leaf
+        GRID_W, GRID_H = tf.shape(labels)[1:3]
 
+        if idx == -1:  # root
+            loss = tf.pow(labels[0] - tf.nn.softmax(logits[0]), 2)
+            loss = tf.reshape(loss, [-1, GRID_H * GRID_W * N_ANCHORS])
+            loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+
+        if self.tree_dict[idx].children:   # traverse until reaching the leaf
             first_child = self.tree_dict[idx].children[0].id
-            logits_softmax = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
+
+            logits_softmax = tf.nn.softmax(logits[..., first_child:first_child + len(self.tree_dict[idx].children)])
             labels_softmax = labels[...,  first_child:first_child + len(self.tree_dict[idx].children)]
 
-            if idx == -1:  # Root
-                logits_softmax = obj_conf * tf.nn.softmax(logits_softmax)
-            else:
-                # Calculate Parent Probability
-                parent = self.tree_dict[idx].parent.children[0].id
-                parent_softmax = tf.nn.softmax(logits[..., parent: parent + len(self.tree_dict[idx].parent.children)])
-                for i, child in enumerate(self.tree_dict[idx].parent.children):
-                    if child.id == idx:
-                        parent_prob = parent_softmax[..., i:i + 1]
-                        logits_softmax = parent_prob * tf.nn.softmax(logits_softmax)  # Prob(Node) = Prob(Node | Parent)
-
-            logits_softmax = tf.cast(logits_softmax, tf.float32)
-            labels_softmax = tf.cast(labels_softmax, tf.float32)
-            cross_entropy = K.categorical_crossentropy(output=logits_softmax, target=labels_softmax, from_logits=False)
-            loss          = tf.reduce_mean(cross_entropy)
+            sub_loss = tf.pow(labels_softmax - logits_softmax, 2)
+            sub_loss = tf.reshape(sub_loss, [-1, GRID_H * GRID_W * N_ANCHORS * (len(self.tree_dict[idx].children))])
+            sub_loss = tf.reduce_mean(tf.reduce_sum(sub_loss, 1))
+            loss += sub_loss
 
             # Calculate loss of each children
             for children in self.tree_dict[idx].children:
-                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels, obj_conf=obj_conf)
+                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels)
                 loss += sub_loss
         return loss
 
 # Test
 if __name__ == "__main__":
-    tree = SoftMaxTree(tree_file='../lisa.tree')
-    print(tree.tree_dict[-1])
+    tree = SoftMaxTree(tree_file='../dataset/combined_lisa/lisa.tree')
+    print(tree.tree_dict[0])

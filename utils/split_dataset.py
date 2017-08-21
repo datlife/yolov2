@@ -20,9 +20,10 @@ def split_data(dataset, training='training_data.csv', testing='testing_data.csv'
 
     with open(testing, 'w') as txt:
         writer = csv.writer(txt, delimiter=',')
-        writer.writerow(["Filename", "x1", "y1", "x2", "y2", "annotation tag"])
+        writer.writerow(["Filename", "annotation tag", "x1", "y1", "x2", "y2", ])
         for item in x_test:
             item = item.split(',')
+            item[1], item[-1] = item[-1], item[1]
             writer.writerow(item)
 
     print(len(x_train))

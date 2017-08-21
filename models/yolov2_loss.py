@@ -19,6 +19,7 @@ import numpy as np
 import tensorflow as tf
 import keras.backend as K
 from cfg import *
+from softmaxtree.Tree import SoftMaxTree
 
 
 def custom_loss(y_true, y_pred):
@@ -29,6 +30,9 @@ def custom_loss(y_true, y_pred):
     :return: a scalar
             loss value
     """
+    if ENABLE_TREE is True:
+        SOFTMAX_TREE = SoftMaxTree(tree_file=TREE)
+
     pred_shape = K.shape(y_pred)[1:3]
     gt_shape = K.shape(y_true)  # shape of ground truth value
     GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
@@ -96,9 +100,12 @@ def custom_loss(y_true, y_pred):
 
     # Category Loss
     # NOTE: YOLOv2 does not use cross-entropy loss.
-    category_loss = tf.pow(true_box_prob - pred_box_prob, 2) * weight_prob
-    category_loss = tf.reshape(category_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * N_CLASSES])
-    category_loss = tf.reduce_mean(tf.reduce_sum(category_loss, 1))
+    if ENABLE_TREE is False:
+        category_loss = tf.pow(true_box_prob - pred_box_prob, 2) * weight_prob
+        category_loss = tf.reshape(category_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * N_CLASSES])
+        category_loss = tf.reduce_mean(tf.reduce_sum(category_loss, 1))
+    else:
+        category_loss = SOFTMAX_TREE.calculate_softmax(idx=-1, logits=y_pred[4:], labels=y_true[4:])
 
     # Finalize the loss
     loss = 0.5 * (loc_loss + obj_conf_loss + category_loss)

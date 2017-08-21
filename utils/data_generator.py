@@ -75,6 +75,8 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                 filename    = instance
                 objects     = training_instances[instance]
                 try:
+                    if not os.path.isfile(filename):
+                        continue
                     img = cv2.imread(filename)
                     height, width, _ = img.shape
                     if np.array_equal(img[:, :, 0], img[:, :, 1]) and np.array_equal(img[:, :, 1], img[:, :, 2]):  # Gray-scale image
