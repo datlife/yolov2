@@ -79,14 +79,14 @@ class SoftMaxTree(object):
         ------
 
         '''
-        encoded_label = np.eye(len(self.tree_dict) - 1)[index]
+        encoded_label = np.eye(len(self.tree_dict))[index]
 
         # Enable parent node
         parent_id = self.tree_dict[index].parent.id
         encoded_label[parent_id] = 1.0
         return encoded_label
 
-    def calculate_softmax(self, idx, logits, labels):
+    def calculate_softmax(self, idx, logits, labels, weights):
         """
         Update Probabilities of each labels accordingly to Hierarchical Structure
         :param idx:   default = -1 / starting from root of soft-max tree
@@ -95,10 +95,12 @@ class SoftMaxTree(object):
         :return:
         """
         loss = 0.0
-        GRID_W, GRID_H = tf.shape(labels)[1:3]
+        gt_shape = tf.shape(labels)[1:3]
+        GRID_W, GRID_H = gt_shape[0], gt_shape[1]
+        if idx == 0:  # root
 
-        if idx == -1:  # root
-            loss = tf.pow(labels[0] - tf.nn.softmax(logits[0]), 2)
+            weight_conf = 0.5 * (1. - weights) + 5.0 * weights
+            loss = tf.pow(labels[..., 0:1] - tf.nn.sigmoid(logits[..., 0:1]), 2) * weight_conf
             loss = tf.reshape(loss, [-1, GRID_H * GRID_W * N_ANCHORS])
             loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
 
@@ -108,14 +110,15 @@ class SoftMaxTree(object):
             logits_softmax = tf.nn.softmax(logits[..., first_child:first_child + len(self.tree_dict[idx].children)])
             labels_softmax = labels[...,  first_child:first_child + len(self.tree_dict[idx].children)]
 
-            sub_loss = tf.pow(labels_softmax - logits_softmax, 2)
+            weights_prob = tf.concat(len(self.tree_dict[idx].children) * [weights], 4)
+            sub_loss = tf.pow(labels_softmax - logits_softmax, 2) * weights_prob
             sub_loss = tf.reshape(sub_loss, [-1, GRID_H * GRID_W * N_ANCHORS * (len(self.tree_dict[idx].children))])
             sub_loss = tf.reduce_mean(tf.reduce_sum(sub_loss, 1))
             loss += sub_loss
 
             # Calculate loss of each children
             for children in self.tree_dict[idx].children:
-                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels)
+                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels, weights=weights)
                 loss += sub_loss
         return loss
 

@@ -43,23 +43,7 @@ def _main_():
     training_dict  = dict([(key, data[key]) for key in shuffled_keys])
 
     # Create one instance for over-fitting model
-    training_dict = dict(training_dict.items()[0:128])
-    with open("test_images.csv", "wb") as csv_file:
-        fieldnames = ['Filename', 'annotation tag', 'x1', 'y1', 'x2', 'y2']
-        import csv
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        for fname in training_dict:
-            gts = training_dict[fname]
-            for gt in gts:
-                box, label = gt
-                xc, yc, w, h = box.to_array()
-                x1 = xc - 0.5*w
-                y1 = yc - 0.5*h
-                x2 = xc + 0.5*w
-                y2 = yc + 0.5*h
-                box = "%s, %s, %s, %s"%(x1, y1, x2, y2)
-                writer.writerow({'Filename': fname, 'annotation tag': label, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2})
-                print("{}, {}, {}\n".format(fname, box, label))
+    training_dict = dict(training_dict.items()[0:1])
 
     # Start training here
     print("Starting training process\n")
@@ -67,27 +51,27 @@ def _main_():
     for layer in yolov2.layers[:-1]:
         layer.trainable = False
     yolov2.summary()
-    print("Stage 1 Training...Frozen all layers except last one")
     model = yolov2
     model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)
+    train_data_gen = flow_from_list(training_dict, batch_size=1)
 
-    train_data_gen = flow_from_list(training_dict, batch_size=16)
-    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / 2, epochs=10, workers=3,
-                        verbose=1)
+    print("Stage 1 Training...Frozen all layers except last one")
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=1, epochs=100, workers=3, verbose=1)
     model.save_weights('stage1.weights')
 
     print("Stage 2 Training...Full training")
 
-    for layer in yolov2.layers:
+    for layer in yolov2.layers[:-19]:
         layer.trainable = True
     yolov2.load_weights('stage1.weights')
 
     model = yolov2
-    model.compile(keras.optimizers.Adam(lr=0.000002), loss=custom_loss)
-    train_data_gen = flow_from_list(training_dict, batch_size=4)
-    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict), epochs=EPOCHS, workers=3,
+    model.compile(keras.optimizers.Adam(lr=0.000003), loss=custom_loss)
+    train_data_gen = flow_from_list(training_dict, batch_size=1)
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict), epochs=900, workers=3,
                         verbose=1)
 
+    print(training_dict)
     model.save_weights('overfit.weights')
 
 if __name__ == "__main__":

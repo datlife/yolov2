@@ -23,7 +23,7 @@ from utils.box import Box, convert_bbox
 from utils.preprocess_img import preprocess_img
 from utils.augment_img import augment_img
 from cfg import *
-
+from softmaxtree.Tree import SoftMaxTree
 # Get list of classes
 with open(CATEGORIES, 'r') as fl:
     CLASSES = np.array(fl.read().splitlines())
@@ -62,6 +62,9 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
     :return:
     """
     slices   = int(len(training_instances)/batch_size)
+    if ENABLE_TREE is True:
+        hier_tree = SoftMaxTree(tree_file=TREE)
+
     # Shuffle data
     keys = training_instances.keys()
     shuffled_keys = random.sample(keys, len(keys))
@@ -71,6 +74,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
             instances = shuffled_keys[i * batch_size:(i * batch_size) + batch_size]
             x_batch = np.zeros((batch_size, IMG_INPUT, IMG_INPUT, 3))
             y_batch = np.zeros((batch_size, IMG_INPUT/SHRINK_FACTOR, IMG_INPUT/SHRINK_FACTOR, N_ANCHORS, 5 + N_CLASSES))
+
             for i, instance in enumerate(instances):
                 filename    = instance
                 objects     = training_instances[instance]
@@ -99,7 +103,12 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                 for obj in objects:
                     bbox, label = obj    # convert label to int
                     index = np.where(CLASSES == label)[0][0]
-                    one_hot = np.eye(N_CLASSES)[index]
+
+                    if ENABLE_TREE is False:
+                        one_hot = np.eye(N_CLASSES)[index]
+                    else:
+                        one_hot = hier_tree.encode_label(index)
+                        one_hot = one_hot[1:]
 
                     # convert to relative value
                     xc, yc, w, h = bbox.to_relative_size((float(width), float(height)))

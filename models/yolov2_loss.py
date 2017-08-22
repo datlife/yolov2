@@ -79,36 +79,37 @@ def custom_loss(y_true, y_pred):
     true_box_conf = tf.expand_dims(best_box * y_true[:, :, :, :, 4], -1)
     true_box_prob = y_true[:, :, :, :, 5:]
 
-    # Compute the weights
-    weight_coor = tf.concat(4 * [true_box_conf], 4)
-    weight_coor = 5.0 * weight_coor
-    weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
-    weight_prob = tf.concat(N_CLASSES * [true_box_conf], 4)
-    weight_prob = 1.0 * weight_prob
-
     # Localization Loss
+    weight_coor = 5.0 * tf.concat(4 * [true_box_conf], 4)
     true_boxes = tf.concat([true_box_xy, true_box_wh], 4)
     pred_boxes = tf.concat([pred_box_xy, pred_box_wh], 4)
     loc_loss = tf.pow(true_boxes - pred_boxes, 2) * weight_coor
     loc_loss = tf.reshape(loc_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
     loc_loss = tf.reduce_mean(tf.reduce_sum(loc_loss, 1))
 
-    # Object Confidence Loss
-    obj_conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
-    obj_conf_loss = tf.reshape(obj_conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS])
-    obj_conf_loss = tf.reduce_mean(tf.reduce_sum(obj_conf_loss, 1))
-
-    # Category Loss
     # NOTE: YOLOv2 does not use cross-entropy loss.
     if ENABLE_TREE is False:
+
+        # Object Confidence Loss
+        weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
+        obj_conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
+        obj_conf_loss = tf.reshape(obj_conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS])
+        obj_conf_loss = tf.reduce_mean(tf.reduce_sum(obj_conf_loss, 1))
+
+        # Category Loss
+        weight_prob = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
         category_loss = tf.pow(true_box_prob - pred_box_prob, 2) * weight_prob
         category_loss = tf.reshape(category_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * N_CLASSES])
         category_loss = tf.reduce_mean(tf.reduce_sum(category_loss, 1))
-    else:
-        category_loss = SOFTMAX_TREE.calculate_softmax(idx=-1, logits=y_pred[4:], labels=y_true[4:])
 
-    # Finalize the loss
-    loss = 0.5 * (loc_loss + obj_conf_loss + category_loss)
+        loss = 0.5 * (loc_loss + obj_conf_loss + category_loss)
+    else:
+        category_loss = SOFTMAX_TREE.calculate_softmax(idx=0, logits=y_pred[..., 4:], labels=y_true[..., 4:],
+                                                       weights=true_box_conf)
+        category_loss = tf.Print(category_loss, [category_loss])
+
+        loss = 0.5 * (loc_loss + category_loss)
+
 
     return loss
 

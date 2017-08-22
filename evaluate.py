@@ -2,6 +2,8 @@ import os
 import cv2
 import csv
 import time
+import fnmatch
+
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
@@ -14,7 +16,9 @@ from utils.preprocess_img import preprocess_img
 
 from argparse import ArgumentParser
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
-parser.add_argument('-f', '--csv-file', help="Path to CSV file", type=str, default='./test_images.csv')
+parser.add_argument('-f', '--csv-file', help="Path to CSV file", type=str, default=None)
+parser.add_argument('-p', '--img-path', help="Path to image directory", type=str, default=None)
+
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
 parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", type=float, default=0.5)
 parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.5)
@@ -25,7 +29,8 @@ ANCHORS    = np.asarray(ANCHORS).astype(np.float32)
 
 def _main_():
     args = parser.parse_args()
-    TEST_DATA = args.csv_file
+    CSV_FILE = args.csv_file
+    IMG_PATH = args.img_path
     WEIGHTS = args.weights
     IOU = args.iou
     THRESHOLD = args.threshold
@@ -36,22 +41,16 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     # Load img path
-    testing_instances = []
-    with open(TEST_DATA, 'rb') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        for row in reader:
-            # print(row)
-            testing_instances.append(row)
+    testing_instances = get_img_path(CSV_FILE, IMG_PATH)
 
     with tf.Session() as sess:
         yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
         yolov2.load_weights(WEIGHTS)
 
         img_shape = K.placeholder(shape=(2,))
+
         # Start prediction
-        boxes, classes, scores = predict(yolov2, img_shape,
-                                         n_classes=N_CLASSES,
-                                         anchors=ANCHORS,
+        boxes, classes, scores = predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
                                          iou_threshold=IOU,
                                          score_threshold=THRESHOLD)
 
@@ -59,8 +58,9 @@ def _main_():
             fieldnames = ['Filename', 'x1', 'y1', 'x2', 'y2', 'annotation tag', 'probabilities']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
-            for instance in testing_instances[1:]:
-                img_path = instance[0]
+            for instance in testing_instances:
+                img_path = instance
+                print img_path
                 if not os.path.isfile(img_path):
                     continue
                 start = time.time()
@@ -69,6 +69,7 @@ def _main_():
                 height, width, _ = orig_img.shape
                 img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
                 img = np.expand_dims(img, 0)
+
                 pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
                                                                   feed_dict={
                                                                       yolov2.input: img,
@@ -80,12 +81,13 @@ def _main_():
                 for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
                     y1, x1, y2, x2 = box
                     bboxes.append(DrawingBox(x1, y1, x2, y2, class_names[cls], score))
-                    # print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
+                    print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
                     writer.writerow({'Filename': img_path,
                                      'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                      'annotation tag': class_names[cls],
                                      'probabilities': score})
                 end2 = time.time()
+
                 # Save image to evaluation dir
                 if OUTPUT is not None:
                     result = draw_bboxes(orig_img, bboxes)
@@ -94,6 +96,30 @@ def _main_():
                 print(
                 "Prediction {} || Boxes {} || Written to images {}".format(end - start, end2 - end, finish - end2))
                 del orig_img, img, bboxes
+
+
+def get_img_path(CSV_FILE, IMG_PATH):
+    testing_instances = []
+    if CSV_FILE is not None:
+        with open(CSV_FILE, 'rb') as csv_file:
+            reader = csv.reader(csv_file, delimiter=',')
+            for row in reader:
+                # print(row)
+                testing_instances.append(row)
+
+            # Extract image path only
+            testing_instances = [i[0] for i in testing_instances[1:]]
+    else:
+        if IMG_PATH is None:
+            raise IOError("Image path is invalid. Either enter CSV file or image path")
+        IMG_PATH = os.path.abspath(IMG_PATH)
+
+        for root, dirnames, filenames in os.walk(IMG_PATH):
+            for filename in fnmatch.filter(filenames, '*.png'):
+                testing_instances.append(os.path.join(root, filename))
+
+    return testing_instances
+
 
 if __name__ == "__main__":
     _main_()
