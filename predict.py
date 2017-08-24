@@ -4,9 +4,12 @@ import numpy as np
 import tensorflow as tf
 import keras.backend as K
 from models.yolov2 import YOLOv2
+from models.yolov2_mobile import MobileYOLOv2
 from models.predict import predict
 from utils.visualize import draw_bboxes
 from utils.draw_boxes import DrawingBox
+from utils.preprocess_img import preprocess_img
+
 from cfg import *
 
 import argparse
@@ -20,8 +23,6 @@ parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", typ
 parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.1)
 
 ANCHORS = np.asarray(ANCHORS).astype(np.float32)
-
-from utils.preprocess_img import preprocess_img
 
 
 def _main_():
@@ -45,7 +46,8 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
+        yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+        # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
         yolov2.load_weights(WEIGHTS)
 
         img_shape = K.placeholder(shape=(2,))
@@ -74,7 +76,7 @@ def _main_():
         # Save image to evaluation dir
         if OUTPUT is not None:
             result = draw_bboxes(orig_img, bboxes)
-            result.save('./evaluation/' + IMG_PATH.split('/')[-1])
+            result.save(os.path.join(OUTPUT, IMG_PATH.split('/')[-1]))
 
 
 if __name__ == "__main__":

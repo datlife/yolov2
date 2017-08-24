@@ -1,10 +1,15 @@
-import time
-import numpy as np
 import keras.backend as K
 import tensorflow as tf
 
+import time
+from softmaxtree.Tree import SoftMaxTree
+from cfg import ENABLE_TREE, TREE
 
-def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, score_threshold=0.6):
+if ENABLE_TREE is True:
+    softmax_tree = SoftMaxTree(TREE)
+
+
+def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, score_threshold=0.6, mode=2):
 
     N_ANCHORS  = len(anchors)
     ANCHORS    = anchors
@@ -15,6 +20,7 @@ def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, sc
 
     prediction = K.reshape(prediction, [-1, pred_shape[1], pred_shape[2], N_ANCHORS, n_classes + 5])
 
+    start = time.time()
     cx = tf.cast((K.arange(0, stop=GRID_W)), dtype=tf.float32)
     cx = K.tile(cx, [GRID_H])
     cx = K.reshape(cx, [-1, GRID_H, GRID_W, 1])
@@ -29,6 +35,7 @@ def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, sc
     c_xy = tf.to_float(c_xy)
     anchors_tensor = tf.to_float(K.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2]))
     netout_size = tf.to_float(K.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]))
+    end = time.time()
 
     box_xy          = K.sigmoid(prediction[..., :2])
     box_wh          = K.exp(prediction[..., 2:4])
@@ -40,12 +47,39 @@ def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, sc
     box_wh    = (box_wh * anchors_tensor) / netout_size
     box_mins  = box_xy - (box_wh / 2.)
     box_maxes = box_xy + (box_wh / 2.)
-
     # Y1, X1, Y2, X2
     boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
+    end2 = time.time()
 
-    box_scores = box_confidence * K.softmax(box_class_probs)
-    box_classes = K.argmax(box_scores, -1)
+    if ENABLE_TREE is False:
+        box_scores = box_confidence * K.softmax(box_class_probs)
+        box_classes = K.argmax(box_scores, -1)
+    else:
+        if mode == 0:
+            box_scores = box_confidence
+            box_classes = K.argmax(box_scores, -1)
+        if mode == 1:
+            n_children = len(softmax_tree.tree_dict[0].children)
+            child_idx = softmax_tree.tree_dict[0].children[0].id
+
+            box_scores = box_confidence * K.softmax(box_class_probs[..., 0:0 + n_children])
+            box_classes = K.argmax(box_scores, -1) + child_idx
+
+        if mode == 2:
+            scores = []
+            n_children = len(softmax_tree.tree_dict[0].children)
+            abst_scores = box_confidence * K.softmax(box_class_probs[..., 0:0 + n_children])
+
+            for node in softmax_tree.tree_dict[0].children:
+                id = node.children[0].id
+                node_prob = abst_scores[..., node.id: node.id + 1]
+                sub_probs = node_prob * K.softmax(box_class_probs[..., id:id + len(node.children)])
+
+                scores.append(sub_probs)
+
+            box_scores = tf.concat(scores, 4)
+            box_classes = K.argmax(box_scores, -1) + 6
+
     box_class_scores = K.max(box_scores, -1)
     prediction_mask = (box_class_scores >= score_threshold)
 
@@ -58,10 +92,13 @@ def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, sc
     image_dims = tf.cast(K.stack([height, width, height, width]), tf.float32)
     image_dims = K.reshape(image_dims, [1, 4])
     boxes = boxes * image_dims
-
+    end3 = time.time()
     nms_index = tf.image.non_max_suppression(boxes, scores, 10, iou_threshold)
     boxes = tf.gather(boxes, nms_index)
     scores = tf.gather(scores, nms_index)
     classes = tf.gather(classes, nms_index)
+    end4 = time.time()
 
-    return boxes, classes, scores
+    timing = (end - start, end2 - end, end3 - end2, end4 - end3)
+    timing = tf.convert_to_tensor(timing, dtype=tf.float32)
+    return boxes, classes, scores, timing

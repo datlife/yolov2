@@ -103,13 +103,12 @@ def custom_loss(y_true, y_pred):
         category_loss = tf.reduce_mean(tf.reduce_sum(category_loss, 1))
 
         loss = 0.5 * (loc_loss + obj_conf_loss + category_loss)
+
     else:
         category_loss = SOFTMAX_TREE.calculate_softmax(idx=0, logits=y_pred[..., 4:], labels=y_true[..., 4:],
-                                                       weights=true_box_conf)
-        category_loss = tf.Print(category_loss, [category_loss])
-
+                                                       pred_obj_conf=pred_box_conf, true_obj_conf=true_box_conf)
+        # category_loss = tf.Print(category_loss, [category_loss])
         loss = 0.5 * (loc_loss + category_loss)
-
 
     return loss
 

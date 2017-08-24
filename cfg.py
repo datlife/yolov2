@@ -1,6 +1,6 @@
 IMG_INPUT = 960
-N_CLASSES = 56
-CATEGORIES = "/home/dat/Documents/yolov2/dataset/combined_lisa/categories.txt"
+N_CLASSES = 62
+CATEGORIES = "/home/dat/Documents/yolov2/dataset/combined_lisa/categories_tree.txt"
 N_ANCHORS  = 5
 
 # Combined LISA Dataset
@@ -13,9 +13,8 @@ ANCHORS = [(1.2255253619, 2.0790172001), (0.88504653628, 1.46357817461), (0.6294
 # LISA Extension Dataset
 # ANCHORS = [(0.845506524725, 1.22186355311), (0.45064008354, 0.678599422442), (1.67509256517, 2.46035742496),
 #            (0.623830460077, 0.919391367777), (1.13196569056, 1.66035474942)]
-
 SHRINK_FACTOR = 32
 
 # HIERARCHICAL TREE ## OPTIONAL
-ENABLE_TREE = False
+ENABLE_TREE = True
 TREE = "/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree"

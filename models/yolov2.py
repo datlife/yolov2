@@ -12,7 +12,7 @@ from keras.layers import MaxPool2D
 from keras.layers.merge import concatenate
 
 
-def YOLOv2(img_size=(608, 608, 3), num_classes=90, num_anchors=5, kernel_regularizer=None):
+def YOLOv2(img_size=(608, 608, 3), num_classes=90, num_anchors=5, kernel_regularizer=None, name='yolov2'):
     """
     Original YOLOv2 Architecture
     :param img_size:
@@ -61,7 +61,7 @@ def YOLOv2(img_size=(608, 608, 3), num_classes=90, num_anchors=5, kernel_regular
     x = conv_block(x, 1024, (3, 3), kernel_regularizer=kernel_regularizer)
 
     # Output layers
-    x = Conv2D(filters=num_anchors*(5 + num_classes), kernel_size=(1, 1), name='yolov2',
+    x = Conv2D(filters=num_anchors * (5 + num_classes), kernel_size=(1, 1), name=name,
                activation='linear', kernel_regularizer=kernel_regularizer)(x)
 
     model = Model(inputs=img_input, outputs=x)

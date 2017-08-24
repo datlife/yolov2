@@ -1,7 +1,8 @@
 TrafficSign,  -1
 
-WarningSign, 0
+WarningSign,  0
 ProhibitSign, 0
+NoTurn,       0
 InfoSign,     0
 SpeedSign,    0
 StopSign,     0
@@ -28,42 +29,43 @@ yieldToPedestrian,   1
 
 doNotEnter,          2
 doNotPass,           2
-noLeftAndUTurn,      2
-noLeftTurn,          2
-noParking,           2
-noRightTurn,         2
-noUTurn,             2
 
-addedLane,           3
-bicyclesMayUseFullLane ,3
-school,              3
-intersection,        3
-intersectionLaneControl ,3
-leftAndUTurnControl ,3
-rampSpeedAdvisory20 ,3
-rampSpeedAdvisory35 ,3
-rampSpeedAdvisory40 ,3
-rampSpeedAdvisory45 ,3
-rampSpeedAdvisory50 ,3
-rampSpeedAdvisoryUrdbl ,3
-roundabout,          3
-speedBumpsAhead,     3
-signalAhead,         3
+noLeftAndUTurn,      3
+noLeftTurn,          3
+noParking,           3
+noRightTurn,         3
+noUTurn,             3
 
-speedLimit15,        4
-speedLimit25,        4
-speedLimit30,        4
-speedLimit35,        4
-speedLimit40,        4
-speedLimit45,        4
-speedLimit50,        4
-speedLimit55,        4
-speedLimit60,        4
-speedLimit65,        4
-speedLimitUrdbl,     4
-schoolSpeedLimit25,  4
-truckSpeedLimit55,   4
+addedLane,               4
+bicyclesMayUseFullLane,  4
+school,                  4
+intersection,            4
+intersectionLaneControl, 4
+leftAndUTurnControl,   4
+rampSpeedAdvisory20,   4
+rampSpeedAdvisory35,   4
+rampSpeedAdvisory40,   4
+rampSpeedAdvisory45,   4
+rampSpeedAdvisory50,   4
+rampSpeedAdvisoryUrdbl,4
+roundabout,            4
+speedBumpsAhead,       4
+signalAhead,           4
+stopAhead,             4
 
-stop,                5
-stopAhead,           5
+speedLimit15,        5
+speedLimit25,        5
+speedLimit30,        5
+speedLimit35,        5
+speedLimit40,        5
+speedLimit45,        5
+speedLimit50,        5
+speedLimit55,        5
+speedLimit60,        5
+speedLimit65,        5
+speedLimitUrdbl,     5
+schoolSpeedLimit25,  5
+truckSpeedLimit55,   5
+
+stop,                6
 

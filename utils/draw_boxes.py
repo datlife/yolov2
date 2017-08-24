@@ -10,7 +10,7 @@ def draw(img, boxes):
     :return: 
     """
     image = Image.fromarray(np.floor(img).astype('uint8'))
-    thickness = (image.size[0] + image.size[1]) // 400
+    thickness = (image.size[0] + image.size[1]) // 600
     for box in boxes:
         p1 = (box.x1, box.y1)
         p2 = (box.x2, box.y2)
@@ -20,6 +20,8 @@ def draw(img, boxes):
         label_size = draw.textsize(label)
         text_origin = np.array([p1[0], p1[1] + 1])
         color = np.random.randint(0, 255, [3])
+        color = np.array([0, 255, 0])
+
         for i in range(thickness):
             draw.rectangle([p1[0] + i, p1[1] + i, p2[0] - i, p2[1] - i], outline=tuple(color))
 

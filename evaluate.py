@@ -9,6 +9,7 @@ import tensorflow as tf
 import keras.backend as K
 from cfg import *
 from models.yolov2 import YOLOv2
+from models.yolov2_mobile import MobileYOLOv2
 from models.predict import predict
 from utils.visualize import draw_bboxes
 from utils.draw_boxes import DrawingBox
@@ -25,6 +26,7 @@ parser.add_argument('-t', '--threshold', help="Threshold value to display box", 
 parser.add_argument('-o', '--output-path', help="Save image to output directory", type=str, default=None)
 
 ANCHORS    = np.asarray(ANCHORS).astype(np.float32)
+MODE = 1
 
 
 def _main_():
@@ -43,16 +45,23 @@ def _main_():
     # Load img path
     testing_instances = get_img_path(CSV_FILE, IMG_PATH)
 
+    # Save image to evaluation dir
+    if OUTPUT is not None:
+        if not os.path.exists(OUTPUT):
+            os.makedirs(OUTPUT)
+
     with tf.Session() as sess:
         yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
-        yolov2.load_weights(WEIGHTS)
+        # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
 
+        yolov2.load_weights(WEIGHTS)
         img_shape = K.placeholder(shape=(2,))
 
         # Start prediction
-        boxes, classes, scores = predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
-                                         iou_threshold=IOU,
-                                         score_threshold=THRESHOLD)
+        boxes, classes, scores, timing = predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
+                                                 iou_threshold=IOU,
+                                                 score_threshold=THRESHOLD,
+                                                 mode=MODE)
 
         with open("detections.csv", "wb") as csv_file:
             fieldnames = ['Filename', 'x1', 'y1', 'x2', 'y2', 'annotation tag', 'probabilities']
@@ -60,41 +69,43 @@ def _main_():
 
             for instance in testing_instances:
                 img_path = instance
-                print img_path
                 if not os.path.isfile(img_path):
                     continue
                 start = time.time()
-
                 orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
                 height, width, _ = orig_img.shape
                 img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
                 img = np.expand_dims(img, 0)
 
-                pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
-                                                                  feed_dict={
-                                                                      yolov2.input: img,
-                                                                      img_shape: [height, width],
-                                                                      K.learning_phase(): 0
-                                                                  })
-                end = time.time()
+                pred_bboxes, pred_classes, pred_scores, run_time = sess.run([boxes, classes, scores, timing],
+                                                                            feed_dict={
+                                                                                yolov2.input: img,
+                                                                                img_shape: [height, width],
+                                                                                K.learning_phase(): 0
+                                                                            })
                 bboxes = []
                 for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
                     y1, x1, y2, x2 = box
                     bboxes.append(DrawingBox(x1, y1, x2, y2, class_names[cls], score))
-                    print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
+                    # print("Found {} with {}% on image {}".format(class_names[cls], score, img_path.split('/')[-1]))
                     writer.writerow({'Filename': img_path,
                                      'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                      'annotation tag': class_names[cls],
                                      'probabilities': score})
-                end2 = time.time()
+                end = time.time()
+
+                print("\n\nBuild GRID {} || Extract prediction {} || Calculation {} || Non-max {}".format(
+                    run_time[0],
+                    run_time[1],
+                    run_time[2],
+                    run_time[3],
+                ))
 
                 # Save image to evaluation dir
                 if OUTPUT is not None:
                     result = draw_bboxes(orig_img, bboxes)
-                    result.save('./evaluation/' + img_path.split('/')[-1])
-                finish = time.time()
-                print(
-                "Prediction {} || Boxes {} || Written to images {}".format(end - start, end2 - end, finish - end2))
+                    result.save(os.path.join(OUTPUT, img_path.split('/')[-1]))
+                print("Predicted in {} secs".format(end - start))
                 del orig_img, img, bboxes
 
 

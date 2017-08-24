@@ -1,6 +1,7 @@
 TrafficSign
 WarningSign
 ProhibitSign
+NoTurn
 InfoSign
 SpeedSign
 StopSign
@@ -45,6 +46,7 @@ rampSpeedAdvisoryUrdbl
 roundabout
 speedBumpsAhead
 signalAhead
+stopAhead
 speedLimit15
 speedLimit25
 speedLimit30
@@ -59,5 +61,3 @@ speedLimitUrdbl
 schoolSpeedLimit25
 truckSpeedLimit55
 stop
-stopAhead
-

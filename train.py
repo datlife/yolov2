@@ -56,8 +56,9 @@ def _main_():
 
     # Build Model
     yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-                    kernel_regularizer=l2(5e-8))
-    yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+                    kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
+    # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+
     # Read training input
     data = parse_inputs(training_path)
     validation_dict = parse_inputs(val_path)
@@ -73,31 +74,32 @@ def _main_():
     print("Starting training process\n")
     print(
     "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
-
-    for layer in yolov2.layers[:-28]:
+    #
+    for layer in yolov2.layers[:-1]:
         layer.trainable = False
     yolov2.summary()
-    # # Load pre-trained file if one is available
+
+    # Load pre-trained file if one is available
     if WEIGHTS_FILE:
         yolov2.load_weights(WEIGHTS_FILE, by_name=True)
+
     model = yolov2
-
-    train_data_gen = flow_from_list(training_dict, batch_size=16, augmentation=True)
-    val_data_gen = flow_from_list(validation_dict, batch_size=16, augmentation=False)
-
+    train_data_gen = flow_from_list(training_dict, batch_size=8, augmentation=True)
+    val_data_gen = flow_from_list(validation_dict, batch_size=8, augmentation=False)
     print("Stage 1 Training...Frozen all layers except last one")
     model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)
     model.fit_generator(generator=train_data_gen,
-                        steps_per_epoch=int(len(training_dict) / 16),
+                        steps_per_epoch=int(len(training_dict) / 8),
                         validation_data=val_data_gen,
-                        validation_steps=int(len(validation_dict) / 16),
+                        validation_steps=int(len(validation_dict) / 8),
                         callbacks=[tf_board, backup_model],
-                        epochs=60, initial_epoch=9, workers=3, verbose=1)
+                        epochs=60, initial_epoch=0, workers=3, verbose=1)
     model.save_weights('stage1.weights')
 
-    for layer in yolov2.layers:
-        layer.trainable = True
+    for layer in yolov2.layers[:-19]:
+        layer.trainable = False
     model = yolov2
+    model.summary()
     model.load_weights('stage1.weights')
     model.compile(keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
     train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
