@@ -55,30 +55,32 @@ def predict(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, sc
         box_scores = box_confidence * K.softmax(box_class_probs)
         box_classes = K.argmax(box_scores, -1)
     else:
+        n_children = len(softmax_tree.tree_dict[0].children)
+        child_idx = softmax_tree.tree_dict[0].children[0].id
+
         if mode == 0:
             box_scores = box_confidence
             box_classes = K.argmax(box_scores, -1)
-        if mode == 1:
-            n_children = len(softmax_tree.tree_dict[0].children)
-            child_idx = softmax_tree.tree_dict[0].children[0].id
 
+        if mode == 1:
             box_scores = box_confidence * K.softmax(box_class_probs[..., 0:0 + n_children])
             box_classes = K.argmax(box_scores, -1) + child_idx
 
         if mode == 2:
             scores = []
-            n_children = len(softmax_tree.tree_dict[0].children)
             abst_scores = box_confidence * K.softmax(box_class_probs[..., 0:0 + n_children])
 
-            for node in softmax_tree.tree_dict[0].children:
-                id = node.children[0].id
-                node_prob = abst_scores[..., node.id: node.id + 1]
-                sub_probs = node_prob * K.softmax(box_class_probs[..., id:id + len(node.children)])
-
+            for i, node in enumerate(softmax_tree.tree_dict[0].children):
+                node_prob = abst_scores[..., i: i + 1]
+                if node.children:
+                    id = node.children[0].id
+                    sub_probs = node_prob * K.softmax(box_class_probs[..., id:id + len(node.children)])
+                else:
+                    sub_probs = node_prob
                 scores.append(sub_probs)
 
             box_scores = tf.concat(scores, 4)
-            box_classes = K.argmax(box_scores, -1) + 6
+            box_classes = K.argmax(box_scores, -1) + len(softmax_tree.tree_dict[0].children) + 2
 
     box_class_scores = K.max(box_scores, -1)
     prediction_mask = (box_class_scores >= score_threshold)

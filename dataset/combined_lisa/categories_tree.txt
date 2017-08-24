@@ -4,7 +4,7 @@ ProhibitSign
 NoTurn
 InfoSign
 SpeedSign
-StopSign
+stop
 curveLeft
 curveRight
 dip
@@ -60,4 +60,3 @@ speedLimit65
 speedLimitUrdbl
 schoolSpeedLimit25
 truckSpeedLimit55
-stop

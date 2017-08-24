@@ -5,7 +5,7 @@ ProhibitSign, 0
 NoTurn,       0
 InfoSign,     0
 SpeedSign,    0
-StopSign,     0
+stop,     0
 
 curveLeft,   1
 curveRight,  1
@@ -66,6 +66,3 @@ speedLimit65,        5
 speedLimitUrdbl,     5
 schoolSpeedLimit25,  5
 truckSpeedLimit55,   5
-
-stop,                6
-

@@ -51,7 +51,6 @@ class SoftMaxTree(object):
             for idx, line in enumerate(lines[1:]):
                 idx = idx + 1
                 name, parent_id = ["".join(s.split()) for s in line.split(',')]  # strip all whitespaces
-                print(name, parent_id)
                 height   = self.tree_dict[int(parent_id)].height + 1
 
                 # Create new node and add to graph dictionary
@@ -77,13 +76,11 @@ class SoftMaxTree(object):
             TrafficSign       SpeedLimit    Speed45
         [0. 0. 1. 0. 0. 0. ... 1...... 0. ...1... 0. ...]
 
-        args
-        ----
+        Args
            index : an integer
 
-        return : an binary_encoded label vector
-        ------
-
+        return :
+            An encoded label vector
         '''
         encoded_label = np.eye(len(self.tree_dict))[index]
 
@@ -114,24 +111,25 @@ class SoftMaxTree(object):
         if self.tree_dict[idx].children:   # traverse until reaching the leaf
             weights_prob = tf.concat(len(self.tree_dict[idx].children) * [true_obj_conf], 4)
             first_child = self.tree_dict[idx].children[0].id
-            logits_softmax = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
-            labels_softmax = labels[...,  first_child:first_child + len(self.tree_dict[idx].children)]
 
-            # Calculate Parent Probability
+            sub_logits = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
+            sub_label = labels[..., first_child:first_child + len(self.tree_dict[idx].children)]
+
+            # # Calculate Parent Probability
             if idx == 0:
-                logits_softmax = pred_obj_conf * tf.nn.softmax(logits_softmax)
+                sub_logits = pred_obj_conf * tf.nn.softmax(sub_logits)
             else:
                 parent = self.tree_dict[idx].parent.children[0].id
                 parent_softmax = tf.nn.softmax(logits[..., parent: parent + len(self.tree_dict[idx].parent.children)])
+                parent_softmax = pred_obj_conf * parent_softmax
 
                 for i, child in enumerate(self.tree_dict[idx].parent.children):
                     if child.id == idx:
-                        parent_prob = pred_obj_conf * parent_softmax[..., i:i + 1]
-                        # parent_prob    = parent_softmax[..., i:i + 1]
+                        parent_prob = parent_softmax[..., i:i + 1]
+                        sub_logits = parent_prob * tf.nn.softmax(sub_logits)
+                        break
 
-                        logits_softmax = parent_prob * tf.nn.softmax(logits_softmax)
-
-            sub_loss = tf.pow(labels_softmax - logits_softmax, 2) * weights_prob
+            sub_loss = tf.pow(sub_label - sub_logits, 2) * weights_prob
             sub_loss = tf.reshape(sub_loss, [-1, GRID_H * GRID_W * N_ANCHORS * (len(self.tree_dict[idx].children))])
             sub_loss = tf.reduce_mean(tf.reduce_sum(sub_loss, 1))
             loss += sub_loss

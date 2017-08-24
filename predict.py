@@ -22,6 +22,11 @@ parser.add_argument('-o', '--output-path', help="Save image to output directory"
 parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", type=float, default=0.5)
 parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.1)
 
+# Hierarchical Tree only
+parser.add_argument('-m', '--mode',
+                    help="(Hierachical Tree Only) detection mode: 0 (Traffic Sign) - 1 (Super class) - 2 (Specific Sign)",
+                    type=int, default=1)
+
 ANCHORS = np.asarray(ANCHORS).astype(np.float32)
 
 
@@ -33,6 +38,7 @@ def _main_():
     OUTPUT = args.output_path
     IOU = args.iou
     THRESHOLD = args.threshold
+    MODE = args.mode
 
     if not os.path.isfile(IMG_PATH):
         print("Image path is invalid.")
@@ -46,27 +52,29 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
-        # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
+        # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+        yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
         yolov2.load_weights(WEIGHTS)
 
         img_shape = K.placeholder(shape=(2,))
 
-        boxes, classes, scores = \
-            predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS, iou_threshold=IOU,
-                    score_threshold=THRESHOLD)
+        # Start prediction
+        boxes, classes, scores, timing = predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
+                                                 iou_threshold=IOU,
+                                                 score_threshold=THRESHOLD,
+                                                 mode=MODE)
 
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
         height, width, _ = orig_img.shape
         img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
         img = np.expand_dims(img, 0)
 
-        pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
-                                                          feed_dict={
-                                                              yolov2.input: img,
-                                                              img_shape: [height, width],
-                                                              K.learning_phase(): 0
-                                                          })
+        pred_bboxes, pred_classes, pred_scores, run_time = sess.run([boxes, classes, scores, timing],
+                                                                    feed_dict={
+                                                                        yolov2.input: img,
+                                                                        img_shape: [height, width],
+                                                                        K.learning_phase(): 0
+                                                                    })
         bboxes = []
         for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
             y1, x1, y2, x2 = box

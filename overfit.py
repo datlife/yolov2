@@ -32,9 +32,9 @@ LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER L
 def _main_():
 
     # Build Model
-    # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-    #                 kernel_regularizer=keras.regularizers.l2(5e-8))
-    yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
+                    kernel_regularizer=keras.regularizers.l2(5e-8))
+    # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
 
     # Load pre-trained weight if one is available
     if WEIGHTS_FILE:
@@ -45,14 +45,12 @@ def _main_():
     training_dict  = dict([(key, data[key]) for key in shuffled_keys])
 
     # Create one instance for over-fitting model
-    size = 4
-    training_dict = dict(training_dict.items()[0:size])
+    size = 1
+    import numpy as np
+    i = np.random.randint(0, len(training_dict))
+    training_dict = dict(training_dict.items()[i:i + size])
     # Start training here
-    print("Starting training process\n")
-    print(
-    "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "None"))
-    #
-    for layer in yolov2.layers[:-28]:
+    for layer in yolov2.layers[:-1]:
         layer.trainable = False
     yolov2.summary()
     model = yolov2
@@ -62,12 +60,12 @@ def _main_():
     print("Stage 1 Training...Frozen all layers except last one")
     print(training_dict)
 
-    model.fit_generator(generator=train_data_gen, steps_per_epoch=size, epochs=50, workers=3, verbose=1)
+    model.fit_generator(generator=train_data_gen, steps_per_epoch=size, epochs=200, workers=3, verbose=1)
     model.save_weights('stage1.weights')
 
     print("Stage 2 Training...Full training")
 
-    for layer in yolov2.layers:
+    for layer in yolov2.layers[:-19]:
         layer.trainable = True
     yolov2.load_weights('stage1.weights')
 
@@ -75,7 +73,7 @@ def _main_():
     model.compile(keras.optimizers.Adam(lr=0.000003), loss=custom_loss)
     train_data_gen = flow_from_list(training_dict, batch_size=size)
     model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / size,
-                        epochs=500, workers=3,
+                        epochs=100, workers=3,
                         verbose=1)
 
     print(training_dict)
