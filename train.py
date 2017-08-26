@@ -55,9 +55,9 @@ def _main_():
         print("A backup directory has been created")
 
     # Build Model
-    yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-                    kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
-    # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+    # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
+    #                 kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
+    yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
 
     # Read training input
     data = parse_inputs(training_path)
@@ -66,15 +66,16 @@ def _main_():
     # Shuffle and load training data into a dictionary [dict[image_path] = list of objects in that image]
     shuffled_keys = random.sample(data.keys(), len(data.keys()))
     training_dict = dict([(key, data[key]) for key in shuffled_keys])
+
     # for Debugging during training
-    tf_board, backup_model = setup_debugger(yolov2)
+    tf_board, backup_model = setup_debugger()
 
     # Start training here
     print("Starting training process\n")
     print(
     "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
 
-    for layer in yolov2.layers[:-1]:
+    for layer in yolov2.layers[:-25]:
         layer.trainable = False
     yolov2.summary()
 
@@ -86,21 +87,21 @@ def _main_():
     train_data_gen = flow_from_list(training_dict, batch_size=16, augmentation=True)
     val_data_gen = flow_from_list(validation_dict, batch_size=16, augmentation=False)
     print("Stage 1 Training...Frozen all layers except last one")
-    model.compile(optimizer=keras.optimizers.adam(lr=0.001), loss=custom_loss)
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.00005), loss=custom_loss)
     model.fit_generator(generator=train_data_gen,
                         steps_per_epoch=int(len(training_dict) / 16),
                         validation_data=val_data_gen,
                         validation_steps=int(len(validation_dict) / 16),
                         callbacks=[tf_board, backup_model],
-                        epochs=60, initial_epoch=0, workers=3, verbose=1)
+                        epochs=2, initial_epoch=0, workers=3, verbose=1)
     model.save_weights('stage1.weights')
 
     keras.backend.clear_session()
-    model_stage2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-                          kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
+    # model_stage2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
+    #                       kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
+    model_stage2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+
     model_stage2.load_weights('stage1.weights')
-    for layer in model_stage2.layers[:-19]:
-        layer.trainable = False
     model_stage2.summary()
 
     model_stage2.compile(keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
@@ -119,7 +120,7 @@ def _main_():
     model_stage2.save_weights('yolov2.weights')
 
 
-def setup_debugger(yolov2):
+def setup_debugger():
     """
     Debugger for monitoring model during training
     :param yolov2:

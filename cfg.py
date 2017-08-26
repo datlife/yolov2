@@ -1,4 +1,4 @@
-IMG_INPUT = 608
+IMG_INPUT = 960
 N_CLASSES = 61
 CATEGORIES = "/home/dat/Documents/yolov2/dataset/combined_lisa/categories_tree.txt"
 N_ANCHORS  = 5

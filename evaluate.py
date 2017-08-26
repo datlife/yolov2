@@ -24,9 +24,11 @@ parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", 
 parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", type=float, default=0.5)
 parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.5)
 parser.add_argument('-o', '--output-path', help="Save image to output directory", type=str, default=None)
+parser.add_argument('-m', '--mode',
+                    help="(Hierachical Tree Only) detection mode: 0 (Traffic Sign) - 1 (Super class) - 2 (Specific Sign)",
+                    type=int, default=1)
 
 ANCHORS    = np.asarray(ANCHORS).astype(np.float32)
-MODE = 1
 
 
 def _main_():
@@ -37,6 +39,7 @@ def _main_():
     IOU = args.iou
     THRESHOLD = args.threshold
     OUTPUT = args.output_path
+    MODE = args.mode
 
     # Load class names
     with open(CATEGORIES, mode='r') as txt_file:

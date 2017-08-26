@@ -60,3 +60,4 @@ speedLimit65
 speedLimitUrdbl
 schoolSpeedLimit25
 truckSpeedLimit55
+stop
