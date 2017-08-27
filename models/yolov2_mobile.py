@@ -1,12 +1,13 @@
 import tensorflow as tf
-from keras.layers import Input
-from keras.models import Model
-from keras.layers import Conv2D
 from keras.layers import BatchNormalization
-from keras.layers import LeakyReLU
+from keras.layers import Conv2D
+from keras.layers import Input
 from keras.layers import Lambda
+from keras.layers import LeakyReLU
 from keras.layers.merge import concatenate
-from models.mobilenet import _depthwise_conv_block, _conv_block
+from keras.models import Model
+
+from models.zoo.mobilenet import _depthwise_conv_block, _conv_block
 
 
 def MobileYOLOv2(img_size=(608, 608, 3), num_classes=90, num_anchors=5, alpha=1.0, depth_multiplier=1):
