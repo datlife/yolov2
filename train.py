@@ -13,19 +13,18 @@ Return
 """
 import os
 import random
+import numpy as np
 from argparse import ArgumentParser
 
 import keras
 from keras.callbacks import TensorBoard
-from keras.regularizers import l2
 
 from cfg import *
-from models.yolov2 import YOLOv2
-from models.yolov2_mobile import MobileYOLOv2
-from models.yolov2_loss import custom_loss
+from models.loss import custom_loss
+from models.FeatureExtractor import FeatureExtractor
+from models.YOLOv2 import YOLOv2
 from utils.data_generator import flow_from_list
 from utils.parser import parse_inputs
-
 parser = ArgumentParser(description="Train YOLOv2")
 parser.add_argument('-p', '--path', help="Path to training data set (e.g. /dataset/lisa/) ", type=str,
                     default='training.txt')
@@ -54,11 +53,9 @@ def _main_():
         os.makedirs(BACK_UP_PATH)
         print("A backup directory has been created")
 
-    # Build Model
-    # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-    #                 kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
-    yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
-
+    # ###############
+    # PREPARE DATA  #
+    # ###############
     # Read training input
     data = parse_inputs(training_path)
     validation_dict = parse_inputs(val_path)
@@ -67,69 +64,54 @@ def _main_():
     shuffled_keys = random.sample(data.keys(), len(data.keys()))
     training_dict = dict([(key, data[key]) for key in shuffled_keys])
 
-    # for Debugging during training
-    tf_board, backup_model = setup_debugger()
+    # Set up data generator
+    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
+    val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
 
-    # Start training here
     print("Starting training process\n")
     print(
     "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
 
-    for layer in yolov2.layers[:-25]:
+    # #################
+    # Construct Model #
+    # #################
+    darknet = FeatureExtractor(is_training=True, img_size=None, model='darknet19')
+    yolo = YOLOv2(num_classes=N_CLASSES,
+                  anchors=np.array(ANCHORS),
+                  is_training=False,
+                  feature_extractor=darknet,
+                  detector='yolov2')
+
+    # Frozen feature extractor
+    for layer in darknet.model.layers:
         layer.trainable = False
-    yolov2.summary()
+
+    model = yolo.model
+    model.summary()
 
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
-        yolov2.load_weights(WEIGHTS_FILE, by_name=True)
+        model.load_weights(WEIGHTS_FILE)
 
-    model = yolov2
-    train_data_gen = flow_from_list(training_dict, batch_size=16, augmentation=True)
-    val_data_gen = flow_from_list(validation_dict, batch_size=16, augmentation=False)
-    print("Stage 1 Training...Frozen all layers except last one")
-    model.compile(optimizer=keras.optimizers.Adam(lr=0.00005), loss=custom_loss)
+    # Set up Tensorboard and Model Backup
+    tf_board = TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
+    backup = keras.callbacks.ModelCheckpoint(BACK_UP_PATH + "best_model-{epoch:02d}-{val_loss:.2f}.weights",
+                                             monitor='val_loss',
+                                             save_weights_only=True, save_best_only=True)
+
+    # ###################
+    # COMPILE AND TRAIN #
+    # ###################
+    model.compile(optimizer=keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
     model.fit_generator(generator=train_data_gen,
-                        steps_per_epoch=int(len(training_dict) / 16),
+                        steps_per_epoch=int(len(training_dict) / BATCH_SIZE),
                         validation_data=val_data_gen,
-                        validation_steps=int(len(validation_dict) / 16),
-                        callbacks=[tf_board, backup_model],
-                        epochs=2, initial_epoch=0, workers=3, verbose=1)
-    model.save_weights('stage1.weights')
+                        validation_steps=int(len(validation_dict) / BATCH_SIZE),
+                        callbacks=[tf_board, backup],
+                        epochs=60, initial_epoch=INITIAL_EPOCH, workers=3, verbose=1)
 
-    keras.backend.clear_session()
-    # model_stage2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS,
-    #                       kernel_regularizer=l2(5e-8), name='YOLOv2-Tree')
-    model_stage2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+    model.save_weights('yolov2.weights')
 
-    model_stage2.load_weights('stage1.weights')
-    model_stage2.summary()
-
-    model_stage2.compile(keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
-    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
-    val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
-
-    print("Stage 2 Training...Full training")
-    model_stage2.fit_generator(generator=train_data_gen,
-                               steps_per_epoch=int(len(training_dict) / BATCH_SIZE),
-                               validation_data=val_data_gen,
-                               validation_steps=int(len(validation_dict) / BATCH_SIZE),
-                               epochs=EPOCHS, initial_epoch=INITIAL_EPOCH,
-                               callbacks=[tf_board, backup_model],
-                               workers=3, verbose=1)
-
-    model_stage2.save_weights('yolov2.weights')
-
-
-def setup_debugger():
-    """
-    Debugger for monitoring model during training
-    :param yolov2:
-    :return:
-    """
-    tf_board     = TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
-    backup       = keras.callbacks.ModelCheckpoint(BACK_UP_PATH+"best_model-{epoch:02d}-{val_loss:.2f}.weights",
-                                                   monitor='val_loss', save_weights_only=True, save_best_only=True)
-    return tf_board, backup
 
 if __name__ == "__main__":
     _main_()

@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
 import tensorflow as tf
-from models.yolov2 import YOLOv2
-from models.predict import predict
-from utils.visualize import draw_bboxes
-from utils.draw_boxes import DrawingBox
 
 from cfg import *
+from models.post_process import predict
+from models.yolov2 import YOLOv2
+from utils.draw_boxes import DrawingBox
+from utils.visualize import draw_bboxes
 
 IMG_PATH   = '/home/dat/Documents/lisa_extension/training/2014-07-11_13-17/2/frameAnnotations-2.avi_annotations/keepRight_1405362361.avi_image1.png'
 WEIGHTS    = './weights/yolo-coco.weights'

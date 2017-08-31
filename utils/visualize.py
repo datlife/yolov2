@@ -5,9 +5,6 @@ import numpy as np
 def draw_bboxes(img, boxes):
     """
     Drawing Bounding Box on Image
-    :param img:   
-    :param boxes: 
-    :return: 
     """
     image = Image.fromarray(np.floor(img).astype('uint8'))
     thickness = (image.size[0] + image.size[1]) // 400

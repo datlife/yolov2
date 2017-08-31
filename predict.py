@@ -1,18 +1,19 @@
-import cv2
+import argparse
 import os
+
+import cv2
+import keras.backend as K
 import numpy as np
 import tensorflow as tf
-import keras.backend as K
-from models.yolov2 import YOLOv2
-from models.yolov2_mobile import MobileYOLOv2
-from models.predict import predict
-from utils.visualize import draw_bboxes
-from utils.draw_boxes import DrawingBox
-from utils.preprocess_img import preprocess_img
+
+from models.YOLOv2 import YOLOv2
+from models.FeatureExtractor import FeatureExtractor
 
 from cfg import *
-
-import argparse
+from models.post_process import post_process
+from utils.draw_boxes import DrawingBox
+from utils.preprocess_img import preprocess_img
+from utils.visualize import draw_bboxes
 
 parser = argparse.ArgumentParser("Over-fit model to validate loss function")
 
@@ -52,29 +53,34 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
-        yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
+        darknet = FeatureExtractor(is_training=True, img_size=None, model='darknet19')
+        yolo = YOLOv2(num_classes=N_CLASSES,
+                      anchors=np.array(ANCHORS),
+                      is_training=False,
+                      feature_extractor=darknet,
+                      detector='yolov2')
+        yolov2 = yolo.model
         yolov2.load_weights(WEIGHTS)
 
         img_shape = K.placeholder(shape=(2,))
 
         # Start prediction
-        boxes, classes, scores, timing = predict(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
-                                                 iou_threshold=IOU,
-                                                 score_threshold=THRESHOLD,
-                                                 mode=MODE)
+        boxes, classes, scores = post_process(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
+                                              iou_threshold=IOU,
+                                              score_threshold=THRESHOLD,
+                                              mode=MODE)
 
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
         height, width, _ = orig_img.shape
         img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
         img = np.expand_dims(img, 0)
 
-        pred_bboxes, pred_classes, pred_scores, run_time = sess.run([boxes, classes, scores, timing],
-                                                                    feed_dict={
-                                                                        yolov2.input: img,
-                                                                        img_shape: [height, width],
-                                                                        K.learning_phase(): 0
-                                                                    })
+        pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
+                                                          feed_dict={
+                                                              yolov2.input: img,
+                                                              img_shape: [height, width],
+                                                              K.learning_phase(): 0
+                                                          })
         bboxes = []
         for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
             y1, x1, y2, x2 = box

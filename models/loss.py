@@ -31,7 +31,7 @@ def custom_loss(y_true, y_pred):
             loss value
     """
     if ENABLE_TREE is True:
-        SOFTMAX_TREE = SoftMaxTree(tree_file=TREE)
+        SOFTMAX_TREE = SoftMaxTree(tree_file=TREE_FILE)
 
     pred_shape = K.shape(y_pred)[1:3]
     gt_shape = K.shape(y_true)  # shape of ground truth value

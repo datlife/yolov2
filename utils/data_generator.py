@@ -63,7 +63,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
     """
     slices   = int(len(training_instances)/batch_size)
     if ENABLE_TREE is True:
-        hier_tree = SoftMaxTree(tree_file=TREE)
+        hier_tree = SoftMaxTree(tree_file=TREE_FILE)
 
     # Shuffle data
     keys = training_instances.keys()

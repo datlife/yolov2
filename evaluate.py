@@ -1,21 +1,22 @@
-import os
-import cv2
 import csv
-import time
 import fnmatch
+import os
+import time
+from argparse import ArgumentParser
 
+import cv2
+import keras.backend as K
 import numpy as np
 import tensorflow as tf
-import keras.backend as K
+
 from cfg import *
+from models.post_process import predict
 from models.yolov2 import YOLOv2
 from models.yolov2_mobile import MobileYOLOv2
-from models.predict import predict
-from utils.visualize import draw_bboxes
 from utils.draw_boxes import DrawingBox
 from utils.preprocess_img import preprocess_img
+from utils.visualize import draw_bboxes
 
-from argparse import ArgumentParser
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
 parser.add_argument('-f', '--csv-file', help="Path to CSV file", type=str, default=None)
 parser.add_argument('-p', '--img-path', help="Path to image directory", type=str, default=None)
@@ -54,8 +55,8 @@ def _main_():
             os.makedirs(OUTPUT)
 
     with tf.Session() as sess:
-        yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
-        # yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
+        # yolov2 = YOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=len(ANCHORS))
+        yolov2 = MobileYOLOv2(img_size=(IMG_INPUT, IMG_INPUT, 3), num_classes=N_CLASSES, num_anchors=N_ANCHORS)
 
         yolov2.load_weights(WEIGHTS)
         img_shape = K.placeholder(shape=(2,))
@@ -74,18 +75,17 @@ def _main_():
                 img_path = instance
                 if not os.path.isfile(img_path):
                     continue
-                start = time.time()
                 orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
                 height, width, _ = orig_img.shape
                 img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
                 img = np.expand_dims(img, 0)
 
-                pred_bboxes, pred_classes, pred_scores, run_time = sess.run([boxes, classes, scores, timing],
-                                                                            feed_dict={
-                                                                                yolov2.input: img,
-                                                                                img_shape: [height, width],
-                                                                                K.learning_phase(): 0
-                                                                            })
+                pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores, timing],
+                                                                  feed_dict={
+                                                                      yolov2.input: img,
+                                                                      img_shape: [height, width],
+                                                                      K.learning_phase(): 0
+                                                                  })
                 bboxes = []
                 for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
                     y1, x1, y2, x2 = box
@@ -95,20 +95,11 @@ def _main_():
                                      'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                      'annotation tag': class_names[cls],
                                      'probabilities': score})
-                end = time.time()
-
-                print("\n\nBuild GRID {} || Extract prediction {} || Calculation {} || Non-max {}".format(
-                    run_time[0],
-                    run_time[1],
-                    run_time[2],
-                    run_time[3],
-                ))
 
                 # Save image to evaluation dir
                 if OUTPUT is not None:
                     result = draw_bboxes(orig_img, bboxes)
                     result.save(os.path.join(OUTPUT, img_path.split('/')[-1]))
-                print("Predicted in {} secs".format(end - start))
                 del orig_img, img, bboxes
 
 
