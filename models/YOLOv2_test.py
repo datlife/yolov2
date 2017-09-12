@@ -44,7 +44,6 @@ if __name__ == '__main__':
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
         height, width, _ = orig_img.shape
         img = yolo.feature_extractor.preprocess(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
-        # img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
         img = np.expand_dims(img, 0)
 
         pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],

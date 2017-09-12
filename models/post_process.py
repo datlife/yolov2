@@ -1,3 +1,11 @@
+"""
+Input: out feature map from network
+
+Output:
+   Bounding Boxes - Classes - Probabilities
+
+"""
+
 import keras.backend as K
 import tensorflow as tf
 from cfg import ENABLE_TREE, TREE_FILE

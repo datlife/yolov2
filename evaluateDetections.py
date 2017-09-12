@@ -70,8 +70,6 @@ def computeMatchStatistics(annotations, detections, pascal=0.5, sizeMinimum=None
             falsePositives.append(fields)
         id += 1
 
-        # @TODO: calculate mAP
-
     return [MatchStats(numAnnotations, tpCount, fpCount, tpCount / (tpCount + fpCount), tpCount / numAnnotations, []),
             # widthsFound),
             falsePositives,

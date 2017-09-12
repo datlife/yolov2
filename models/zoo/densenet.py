@@ -1,8 +1,8 @@
 from keras.models import load_model, Model
 
 
-def densenet(include_top=True):
-    base = load_model('./weights/densenet201.h5')
+def densenet(include_top=True, model_path='./weights/densenet201.h5'):
+    base = load_model(model_path)
 
     if include_top:
         model = Model(base.inputs, base.outputs)

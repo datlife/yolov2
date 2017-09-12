@@ -15,15 +15,16 @@ class FeatureExtractor(object):
     def __init__(self,
                  is_training,
                  img_size,
-                 model):
-        self.name = model
+                 model,
+                 model_path=None):
 
+        self.name = model
         self._is_training = is_training
         self.img_size = img_size
         self._preprocess_fn = preprocessor[model]
-        self.model = self._get_feature_extractor_from_zoo(model, img_size)
+        self.model = self._get_feature_extractor_from_zoo(model, img_size, model_path)
 
-    def _get_feature_extractor_from_zoo(self, model, img_size):
+    def _get_feature_extractor_from_zoo(self, model, img_size, model_path):
         """
         """
         global MODEL_ZOO
@@ -34,7 +35,7 @@ class FeatureExtractor(object):
         if model != 'densenet':
             return MODEL_ZOO[model](img_size, include_top=False)
         else:
-            return MODEL_ZOO[model](include_top=False)
+            return MODEL_ZOO[model](include_top=False, model_path=model_path)
 
     def preprocess(self, resized_inputs):
         return self._preprocess_fn(resized_inputs)

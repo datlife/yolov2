@@ -17,16 +17,25 @@ from utils.visualize import draw_bboxes
 
 parser = argparse.ArgumentParser("Over-fit model to validate loss function")
 
-parser.add_argument('-p', '--path', help="Path to image file", type=str, default=None)
-parser.add_argument('-w', '--weights', help="Path to pre-trained weight files", type=str, default=None)
-parser.add_argument('-o', '--output-path', help="Save image to output directory", type=str, default=None)
-parser.add_argument('-i', '--iou', help="IoU value for Non-max suppression", type=float, default=0.5)
-parser.add_argument('-t', '--threshold', help="Threshold value to display box", type=float, default=0.1)
+parser.add_argument('-p', '--path',
+                    help="Path to image file", type=str, default=None)
+
+parser.add_argument('-w', '--weights',
+                    help="Path to pre-trained weight files", type=str, default=None)
+
+parser.add_argument('-o', '--output-path',
+                    help="Save image to output directory", type=str, default=None)
+
+parser.add_argument('-i', '--iou',
+                    help="IoU value for Non-max suppression", type=float, default=0.5)
+
+parser.add_argument('-t', '--threshold',
+                    help="Threshold value to display box", type=float, default=0.1)
 
 # Hierarchical Tree only
 parser.add_argument('-m', '--mode',
                     help="(Hierachical Tree Only) detection mode: 0 (Traffic Sign) - 1 (Super class) - 2 (Specific Sign)",
-                    type=int, default=1)
+                    type=int, default=2)
 
 ANCHORS = np.asarray(ANCHORS).astype(np.float32)
 
@@ -53,12 +62,12 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        darknet = FeatureExtractor(is_training=True, img_size=None, model='darknet19')
+        darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
         yolo = YOLOv2(num_classes=N_CLASSES,
                       anchors=np.array(ANCHORS),
                       is_training=False,
                       feature_extractor=darknet,
-                      detector='yolov2')
+                      detector=MODEL_TYPE)
         yolov2 = yolo.model
         yolov2.load_weights(WEIGHTS)
 
@@ -72,7 +81,7 @@ def _main_():
 
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
         height, width, _ = orig_img.shape
-        img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
+        img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE)))
         img = np.expand_dims(img, 0)
 
         pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],

@@ -5,11 +5,12 @@ def _test():
     darknet = FeatureExtractor(is_training=True, img_size=None, model='yolov2')
     darknet.model.summary()
 
-    darknet = FeatureExtractor(is_training=True, img_size=None, model='mobilenet')
-    darknet.model.summary()
+    mobilenet = FeatureExtractor(is_training=True, img_size=None, model='mobilenet')
+    mobilenet.model.summary()
 
-    darknet = FeatureExtractor(is_training=True, img_size=None, model='densenet')
-    darknet.model.summary()
+    densenet = FeatureExtractor(is_training=True, img_size=None, model='densenet',
+                                model_path='../weights/densenet201.h5')
+    densenet.model.summary()
 
 
 if __name__ == '__main__':

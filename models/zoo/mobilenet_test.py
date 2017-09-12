@@ -5,7 +5,7 @@ from keras.applications.resnet50 import decode_predictions
 from mobilenet import mobile_net, preprocess_input
 
 # Set up model
-mobilenet = mobile_net(input_size=(224, 224, 3))
+mobilenet = mobile_net(input_size=(224, 224, 3), include_top=True)
 mobilenet.load_weights('../../weights/mobilenet.h5')
 mobilenet.summary()
 

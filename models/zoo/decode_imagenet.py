@@ -1,5 +1,5 @@
-CLASS_INDEX_PATH = '../../dataset/imagenet.labels.list'
-CLASS_NAMES_PATH = '../../dataset/imagenet.shortnames.list'
+CLASS_INDEX_PATH = '../../dataset/imagenet/imagenet.labels.list'
+CLASS_NAMES_PATH = '../../dataset/imagenet/imagenet.shortnames.list'
 
 
 def decode_predictions(preds, top=5):

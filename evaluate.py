@@ -71,7 +71,7 @@ def _main_():
     with tf.Session() as sess:
         darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
         yolo = YOLOv2(num_classes=N_CLASSES,
-                      anchors=np.array(ANCHORS) * (IMG_INPUT / 608),
+                      anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
                       is_training=False,
                       feature_extractor=darknet,
                       detector=MODEL_TYPE)
@@ -102,7 +102,7 @@ def _main_():
                 orig_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
                 height, width, _ = orig_img.shape
 
-                img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
+                img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE)))
                 img = np.expand_dims(img, 0)
 
                 pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],

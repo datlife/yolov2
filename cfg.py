@@ -4,16 +4,15 @@ Main configuration file for YOLOv2 Project
 
 MODEL_TYPE: feature extractor definition
     Currently supported:
+        'yolov2':     Original YOLOv2 feature extractor
         'mobilenet' : MobileNet implementation from Google
-        'darknet_19': Original YOLOv2 feature extractor
         'densenet'  : Densely Connected convolutional network (Facebook)
 
-
 '''
-MODEL_TYPE = 'yolov2'
-IMG_INPUT = 480
+MODEL_TYPE = 'yolov2'  # feature extractor definition
+IMG_INPUT_SIZE = 480  # image resolution for inputs
 N_CLASSES = 61
-N_ANCHORS  = 5
+N_ANCHORS = 5
 SHRINK_FACTOR = 32  # Max-pooling 5 times --> 2^5 = 32 (feature-map size is reduced 32 times)
 
 CATEGORIES = "/home/dat/Documents/yolov2/dataset/combined_lisa/categories_tree.txt"

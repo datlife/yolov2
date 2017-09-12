@@ -110,7 +110,7 @@ def _main_():
 
     # set up detection model
     detection_model = YOLOv2(num_classes=N_CLASSES,
-                             anchors=np.array(ANCHORS) * (IMG_INPUT / 608),
+                             anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
                              is_training=False,
                              feature_extractor=feature_extractor,
                              detector=MODEL_TYPE)

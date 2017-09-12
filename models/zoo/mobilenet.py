@@ -1,5 +1,7 @@
 """
-Original MobileNet Implementation on Kers
+MobileNet Implementation in Keras
+
+Author: https://github.com/fchollet/keras/blob/master/keras/applications/mobilenet.py
 """
 import keras.backend as K
 from keras.layers import Input, InputSpec
@@ -80,7 +82,7 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha, depth_multiplie
     x = Activation(relu6, name='conv_dw_%d_relu' % block_id)(x)
 
     x = Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1), name='conv_pw_%d' % block_id)(x)
-    # x = BatchNormalization(name='conv_pw_%d_bn' % block_id)(x)
+    x = BatchNormalization(name='conv_pw_%d_bn' % block_id)(x)
     return Activation(relu6, name='conv_pw_%d_relu' % block_id)(x)
 
 

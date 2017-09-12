@@ -4,18 +4,17 @@ import numpy as np
 from decode_imagenet import decode_predictions
 from darknet19 import yolo_preprocess_input
 from densenet import densenet
-from keras.models import load_model, Model
-from keras.layers import Activation
+
 
 # Set up model
-densenet = densenet(include_top=True)
+densenet = densenet(include_top=True, model_path='../../weights/densenet201.h5')
 
 
 def predict_one_example():
     # Prepare data input
     img_path = '../../test_imgs/cat.jpg'
     img = cv2.imread(img_path)
-    img = cv2.resize(img, (608, 608))
+    img = cv2.resize(img, (256, 256))
     x = yolo_preprocess_input(img)
     x = np.expand_dims(x, axis=0)
     preds = densenet.predict(x)

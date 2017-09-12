@@ -1,4 +1,11 @@
 """
+Input: out feature map from network
+
+Output:
+   A scalar - loss value
+
+------------------
+
 Loss of YOLOv2 Implementation. Few Notes
     * What we get from the CNN is a feature map (imagine as a 3-D box)
     * Each cell in a feature map is a vector size N_ANCHORS* (5 + N_CLASSES)  as:
