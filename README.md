@@ -48,10 +48,10 @@ path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 Assumption:
 * If one image contains more than one objects, it would be split into multiple lines.
 * `x1, y1, x2, y2` are absolute cooridinates.
-* `class_name` are a string, no space or special characters
+* `class_name` are a string, no space or special characters.
         
         
-**Step 2: Generate dataset for training
+**Step 2: Generate dataset for training **
 
 ```
 python create_dataset.py
@@ -61,44 +61,50 @@ python create_dataset.py
    --split       false
 ```
 
-This will create the following files:
+It will create the following files:
 ```
 yolov2
 |
 |- dataset
-     | - - - my_new_data_set
+     | - my_new_data_set
+         |
          | --  categories.txt
          | --  anchors.txt
          | --  training_data.csv
          | --  testing_data.csv   # if split is enabled
 ```
 
-**Step 3: Update parameters in `cfg.py` file**
 
+**Step 3: Update parameters in `cfg.py` file**
+Example:
 ```
-N_CLASSES     = 31   # <---- Number of classes in your data set
-AUGMENT_LEVEL = 5    # The higher, the more data is augmented
-ANCHORS       = np.array(((0.023717899133663362, 0.035715759075907606),  # <--- Update from anchors.txt
-                          (0.059577141608391594, 0.08738709207459215),
-                          (0.08816276658767774, 0.1294924960505529),
-                          (0.03283318210930825, 0.0483890193566751),
-                          (0.04450034340659346, 0.064308608058608)))
-SHRINK_FACTOR = 32   # **For DarkNet19 only (max-pool 5 times) ** 2^5 = 32. If using different feature extractor, update accordingly
+FEATURE_EXTRACTOR     = 'yolov2'
+IMG_INPUT_SIZE = 480
+N_CLASSES      = 61
+N_ANCHORS      = 5
+
+# Map indices to actual label names
+CATEGORIES = "./dataset/my_new_dataset/categories_tree.txt"
+ANCHORS    = "./dataset/my_new_dataset/anchors.txt"
 ```
 
 **Step 4: Fine-tune for your own dataset**
 
 * Training on your own datset
 ```angular2html
-./train.py --weight_path yolov2.weights --training_data your_own_data.txt --epochs 1000
+python train.py  \
+   --epochs        100
+   --batch         8
+   --learning_rate 0.00001
+   --training_data your_own_data.txt 
 ```
 
-
-## Run YOLOv2 using a webcam as input
-```angular2html
-./webcam.py --weight_path yolov2.weights
+** Step 5: Evaluate your finetuned model
 ```
-
+python evaluate.py 
+---weights yolov2.weights
+---csv_path ./dataset/my_new_dataset/testing_data.csv
+```
 
 ## TODO List:
 - [x] Generate anchors using K-mean clustering on training data
