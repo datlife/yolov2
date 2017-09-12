@@ -8,7 +8,6 @@ Project Status: **Under Development!!**
 
 * Set up environment
 ```
-# at ./yolov2 
 conda env create -f environment.yml
 ```
 * Activate environment
@@ -25,7 +24,6 @@ conda install -c menpo opencv=2.4.11
 
 * Download weight files. This will download neccessary weight files for this project, including 'Mobilenet', 'DenseNet', 'YOLov2'
 ```
-# At ./yolov2 and conda environment has been activated
 python weights/download_weights.py
 ```
 
@@ -48,9 +46,10 @@ path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 ```
 
 Assumption:
-   * If one image contains more than one objects, it would be split into multiple lines.
-   * `x1, y1, x2, y2` are absolute cooridinates.
-   * `class_name` are a string, no space or special characters
+* If one image contains more than one objects, it would be split into multiple lines.
+* `x1, y1, x2, y2` are absolute cooridinates.
+* `class_name` are a string, no space or special characters
+        
         
 **Step 2: Generate dataset for training
 
@@ -60,6 +59,18 @@ python create_dataset.py
    --output_dir ./dataset/my_new_dataset
    --n_anchors   5
    --split       false
+```
+
+This will create the following files:
+```
+yolov2
+|
+|- dataset
+     | - - - my_new_data_set
+         | --  categories.txt
+         | --  anchors.txt
+         | --  training_data.csv
+         | --  testing_data.csv   # if split is enabled
 ```
 
 **Step 3: Update parameters in `cfg.py` file**
