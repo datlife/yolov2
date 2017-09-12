@@ -23,7 +23,7 @@ conda install -c menpo opencv=2.4.11
 
 ## Usage
 
-* Download weight files. This will download neccessary weight files for this project, including 'Mobilenet', 'DenseNet', 'YOLov2'
+* Download weight files. 
 ```
 python weights/download_weights.py
 ```
