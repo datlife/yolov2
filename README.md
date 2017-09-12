@@ -11,20 +11,40 @@ Download: [YOLOv2 Keras Weights]()
 - [x] Convert DarkNet19 weights to Keras weights
 - [x] YOLOv2 Loss Function
 - [x] Multi-scale  Training
-- [ ] LSTM Tracker
-- [ ] Hierarchical Tree - Combine multiple data sets like YOLO9000 using
-- [ ] Train on any custom data set
-- [ ] Use MobileNet as feature extractor (super fast, accuracy ~ VGG-16)
+- [x] Hierarchical Tree
+- [x] Train on any custom data set
+- [x] Use MobileNet/DenseNet as feature extractor.
 
 ## Dependencies
+
+* Set up environment
+```
+# at ./yolov2 
+conda env create -f environment.yml
+```
+* Activate environment
+```
+source activate yolo
+```
+* Install Opnecv
+```
 conda install -c menpo opencv=2.4.11
-
-## Examples
-
-* Detect objects in a given image
 ```
-./predict.py --weight_path yolov2.weights test_image.jpg 
+
+
+## Usage
+
+* Download weight files:
 ```
+# at ./yolov2
+python weights/download_weights.py
+```
+
+* Detect objects in a given image using original YOLOv2
+```
+python predict.py --weight_path yolov2.weights test_image.jpg 
+```
+
 ## Train on custom data set
         
 **Step 1: Prepares training data**
