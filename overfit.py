@@ -39,6 +39,7 @@ EPOCHS          = args.epochs
 LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
 
 import tensorflow as tf
+
 def _main_():
     # ###################
     # PREPARE DATA INPUT
@@ -56,32 +57,33 @@ def _main_():
     # #################
     # CONSTRUCT MODEL
     # #################
-    darknet = FeatureExtractor(is_training=True, img_size=None, model='densenet')
-    yolo = YOLOv2(num_classes=N_CLASSES,
-                  anchors=np.array(ANCHORS),
-                  is_training=False,
-                  feature_extractor=darknet,
-                  detector='densenet')
+    with tf.variable_scope('yolov2', regularizer=None):
+        darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
+        yolo = YOLOv2(num_classes=N_CLASSES,
+                      anchors=np.array(ANCHORS),
+                      is_training=False,
+                      feature_extractor=darknet,
+                      detector=MODEL_TYPE)
 
-    for l in yolo.feature_extractor.model.layers:
-        l.trainable = False
+        for l in yolo.feature_extractor.model.layers:
+            l.trainable = False
 
-    model = yolo.model
-    if WEIGHTS_FILE:
-        model.load_weights(WEIGHTS_FILE, by_name=True)
-    model.summary()
+        model = yolo.model
+        if WEIGHTS_FILE:
+            model.load_weights(WEIGHTS_FILE, by_name=True)
+        model.summary()
 
-    # #################
-    # COMPILE AND RUN
-    # #################
-    model.compile(keras.optimizers.Adam(lr=0.001), loss=custom_loss)
-    train_data_gen = flow_from_list(training_dict, batch_size=size)
-    model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / size,
-                        epochs=EPOCHS, workers=3,
-                        verbose=1)
+        # #################
+        # COMPILE AND RUN
+        # #################
+        model.compile(keras.optimizers.Adam(lr=0.001), loss=custom_loss)
+        train_data_gen = flow_from_list(training_dict, batch_size=size)
+        model.fit_generator(generator=train_data_gen, steps_per_epoch=len(training_dict) / size,
+                            epochs=EPOCHS, workers=3,
+                            verbose=1)
 
-    print(training_dict)
-    model.save_weights('overfit.weights')
+        print(training_dict)
+        model.save_weights('overfit.weights')
 
 if __name__ == "__main__":
     _main_()

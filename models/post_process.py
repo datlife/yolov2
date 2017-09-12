@@ -2,13 +2,12 @@ import keras.backend as K
 import tensorflow as tf
 from cfg import ENABLE_TREE, TREE_FILE
 
-if ENABLE_TREE is True:
-    from softmaxtree.Tree import SoftMaxTree
-
-    softmax_tree = SoftMaxTree(TREE_FILE)
-
 
 def post_process(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, score_threshold=0.6, mode=2):
+    if ENABLE_TREE is True:
+        from softmaxtree.Tree import SoftMaxTree
+        softmax_tree = SoftMaxTree(TREE_FILE)
+
     N_ANCHORS  = len(anchors)
     ANCHORS    = anchors
 
@@ -45,7 +44,8 @@ def post_process(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.
     box_mins  = box_xy - (box_wh / 2.)
     box_maxes = box_xy + (box_wh / 2.)
     # Y1, X1, Y2, X2
-    boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1], box_maxes[..., 1:2], box_maxes[..., 0:1]])
+    boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1],  # Y1 X1
+                           box_maxes[..., 1:2], box_maxes[..., 0:1]])  # Y2 X2
 
     if ENABLE_TREE is False:
         box_scores = box_confidence * K.softmax(box_class_probs)

@@ -1,7 +1,20 @@
-IMG_INPUT = 960
+'''
+Main configuration file for YOLOv2 Project
+
+
+MODEL_TYPE: feature extractor definition
+    Currently supported:
+        'mobilenet' : MobileNet implementation from Google
+        'darknet_19': Original YOLOv2 feature extractor
+        'densenet'  : Densely Connected convolutional network (Facebook)
+
+
+'''
+MODEL_TYPE = 'yolov2'
+IMG_INPUT = 480
 N_CLASSES = 61
 N_ANCHORS  = 5
-SHRINK_FACTOR = 32  # Max-pooling 5 times --> 2^5 = 32 (feature map size is reduced 32 times)
+SHRINK_FACTOR = 32  # Max-pooling 5 times --> 2^5 = 32 (feature-map size is reduced 32 times)
 
 CATEGORIES = "/home/dat/Documents/yolov2/dataset/combined_lisa/categories_tree.txt"
 
@@ -16,7 +29,3 @@ TREE_FILE = "/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree"
 
 # COCO Dataset
 # ANCHORS    = [(0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434), (7.88282, 3.52778), (9.77052, 9.16828)]
-
-# LISA Extension Dataset
-# ANCHORS = [(0.845506524725, 1.22186355311), (0.45064008354, 0.678599422442), (1.67509256517, 2.46035742496),
-#            (0.623830460077, 0.919391367777), (1.13196569056, 1.66035474942)]

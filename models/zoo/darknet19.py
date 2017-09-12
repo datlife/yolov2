@@ -8,6 +8,7 @@ from keras.layers import MaxPool2D
 from keras.layers import BatchNormalization, Activation
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import GlobalAvgPool2D
+from keras.regularizers import l2
 from keras.models import Model
 
 
@@ -80,7 +81,8 @@ def conv_block(x, filters, kernel_size, name=None):
     :param kernel_regularizer:
     :return:
     """
-    x = Conv2D(filters=filters, kernel_size=kernel_size, padding='same', use_bias=False, name=name)(x)
+    x = Conv2D(filters=filters, kernel_size=kernel_size, padding='same',
+               use_bias=False, name=name)(x)
     x = BatchNormalization(name=name if name is None else 'batch_norm_%s' % name)(x)
     x = LeakyReLU(alpha=0.1, name=name if name is None else 'leaky_relu_%s' % name)(x)
     return x

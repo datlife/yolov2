@@ -1,5 +1,4 @@
 import cv2
-import timeit
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
@@ -16,28 +15,9 @@ CATEGORIES = '../dataset/coco/categories.txt'
 WEIGHTS = '../weights/yolo-coco.weights'
 
 
-def _test(yolov2, orig_img, boxes, classes, scores, img_shape):
-    height, width, _ = orig_img.shape
-    img = (cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
-    img = img / 255.
-    img = np.expand_dims(img, 0)
-
-    pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
-                                                      feed_dict={
-                                                          yolov2.input: img,
-                                                          img_shape: [height, width],
-                                                          K.learning_phase(): 0
-                                                      })
-
-
-def measure_performance():
-    global yolov2, orig_img, boxes, classes, scores, img_shape
-    _test(yolov2, orig_img, boxes, classes, scores, img_shape)
-
-
 if __name__ == '__main__':
     with tf.Session() as sess:
-        darknet = FeatureExtractor(is_training=True, img_size=None, model='darknet19')
+        darknet = FeatureExtractor(is_training=True, img_size=None, model='yolov2')
         yolo = YOLOv2(num_classes=80,
                       anchors=np.array(ANCHORS),
                       is_training=False,
@@ -45,8 +25,6 @@ if __name__ == '__main__':
                       detector='yolov2')
         if WEIGHTS:
             yolo.model.load_weights(WEIGHTS)
-        else:
-            sess.run(tf.global_variables_initializer())
 
         yolov2 = yolo.model
         yolov2.summary()
@@ -64,10 +42,18 @@ if __name__ == '__main__':
                                               score_threshold=0.5, mode=2)
 
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
-        performance = timeit.repeat('measure_performance()', "from __main__ import measure_performance",
-                                    number=1, repeat=10)
+        height, width, _ = orig_img.shape
+        img = yolo.feature_extractor.preprocess(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
+        # img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT, IMG_INPUT)))
+        img = np.expand_dims(img, 0)
 
-        avg = np.average(performance[1:])
-        print ("Average forward pass : {} ms".format(avg * 1000))
-        print ("Average FPS: {} fps".format(1 / avg))
-        print(performance)
+        pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
+                                                          feed_dict={
+                                                              yolov2.input: img,
+                                                              img_shape: [height, width],
+                                                              K.learning_phase(): 0
+                                                          })
+        bboxes = []
+        for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
+            y1, x1, y2, x2 = box
+            print("Found {} with {}% on image {}".format(class_names[cls], score, IMG_PATH.split('/')[-1]))

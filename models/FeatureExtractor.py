@@ -2,11 +2,11 @@ from zoo import darknet19, yolo_preprocess_input
 from zoo import mobile_net, preprocess_input
 from zoo import densenet
 
-MODEL_ZOO = {'darknet19': darknet19,
+MODEL_ZOO = {'yolov2': darknet19,
              'mobilenet': mobile_net,
              'densenet': densenet}
 
-preprocessor = {'darknet19': yolo_preprocess_input,
+preprocessor = {'yolov2': yolo_preprocess_input,
                 'densenet': yolo_preprocess_input,
                 'mobilenet': preprocess_input}
 
@@ -16,6 +16,7 @@ class FeatureExtractor(object):
                  is_training,
                  img_size,
                  model):
+        self.name = model
 
         self._is_training = is_training
         self.img_size = img_size

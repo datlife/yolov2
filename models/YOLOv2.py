@@ -4,7 +4,7 @@ from keras.layers import Lambda, Conv2D, BatchNormalization, Activation
 from keras.layers.merge import concatenate
 import tensorflow as tf
 from keras.models import Model
-
+from keras.regularizers import l2
 FINE_GRAINED_LAYERS = {'yolov2': 'leaky_re_lu_13',
                        'mobilenet': 'conv_pw_11_relu',
                        'densenet': 'leaky_re_lu_136'}
@@ -36,7 +36,7 @@ def yolov2_detector(feature_extractor, num_classes, num_anchors, fine_grained_la
 
     x = concatenate([x, x2])
     x = conv_block(x, 1024, (3, 3))
-    x = Conv2D(num_anchors * (num_classes + 5), (1, 1), name='yolov2')(x)
+    x = Conv2D(num_anchors * (num_classes + 5), (1, 1), name='yolov2', kernel_regularizer=l2(5e-4))(x)
 
     return x
 
@@ -132,8 +132,10 @@ class YOLOv2(object):
         self.anchors = anchors
         self._is_training = is_training
         self.feature_extractor = feature_extractor
-        self.fine_grained_layers = FINE_GRAINED_LAYERS[detector]
+
+        self.fine_grained_layers = FINE_GRAINED_LAYERS[feature_extractor.name]
         self.detector = DETECTOR[detector](feature_extractor, num_classes, len(anchors), self.fine_grained_layers)
+
         self.model = Model(inputs=feature_extractor.model.input, outputs=self.detector)
 
     def post_process(self):
