@@ -77,6 +77,7 @@ yolov2
 
 
 **Step 3: Update parameters in `cfg.py` file**
+
 Example:
 ```
 FEATURE_EXTRACTOR     = 'yolov2'
