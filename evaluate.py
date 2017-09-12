@@ -1,5 +1,12 @@
 """
+Performance Evaluation on a image directory or a CSV file (containing path to images)
 
+Inputs:
+   A image directory with file extension as *.png:
+   OR a CSV containing paths to images
+
+Output:
+   a CSV file for measuring mAP with ground truth
 """
 
 import csv
@@ -47,14 +54,14 @@ parser.add_argument('-m', '--mode',
 
 
 def _main_():
-    args = parser.parse_args()
-    CSV_FILE = args.csv_file
-    IMG_PATH = args.img_path
-    WEIGHTS = args.weights
-    IOU = args.iou
+    args      = parser.parse_args()
+    CSV_FILE  = args.csv_file
+    IMG_PATH  = args.img_path
+    WEIGHTS   = args.weights
+    IOU       = args.iou
     THRESHOLD = args.threshold
-    OUTPUT = args.output_path
-    MODE = args.mode
+    OUTPUT    = args.output_path
+    MODE      = args.mode
 
     # Load class names
     with open(CATEGORIES, mode='r') as txt_file:
@@ -69,12 +76,12 @@ def _main_():
             os.makedirs(OUTPUT)
 
     with tf.Session() as sess:
-        darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
+        darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
         yolo = YOLOv2(num_classes=N_CLASSES,
                       anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
                       is_training=False,
                       feature_extractor=darknet,
-                      detector=MODEL_TYPE)
+                      detector=FEATURE_EXTRACTOR)
 
         yolov2 = yolo.model
         yolov2.summary()

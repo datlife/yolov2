@@ -3,6 +3,7 @@ Overfit one image with 1000 epochs to test the loss function properly
 """
 import random
 import keras
+import tensorflow as tf
 import numpy as np
 from argparse import ArgumentParser
 
@@ -38,7 +39,6 @@ BATCH_SIZE      = args.batch
 EPOCHS          = args.epochs
 LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
 
-import tensorflow as tf
 
 def _main_():
     # ###################
@@ -58,12 +58,12 @@ def _main_():
     # CONSTRUCT MODEL
     # #################
     with tf.variable_scope('yolov2', regularizer=None):
-        darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
+        darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
         yolo = YOLOv2(num_classes=N_CLASSES,
                       anchors=np.array(ANCHORS),
                       is_training=False,
                       feature_extractor=darknet,
-                      detector=MODEL_TYPE)
+                      detector=FEATURE_EXTRACTOR)
 
         for l in yolo.feature_extractor.model.layers:
             l.trainable = False

@@ -62,12 +62,12 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        darknet = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
+        darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
         yolo = YOLOv2(num_classes=N_CLASSES,
                       anchors=np.array(ANCHORS),
                       is_training=False,
                       feature_extractor=darknet,
-                      detector=MODEL_TYPE)
+                      detector=FEATURE_EXTRACTOR)
         yolov2 = yolo.model
         yolov2.load_weights(WEIGHTS)
 

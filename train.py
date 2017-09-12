@@ -98,22 +98,21 @@ def _main_():
     val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
 
     print("Starting training process\n")
-    print(
-    "Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
+    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
 
     # #################
     # Construct Model #
     # #################
 
     # set up feature extractor
-    feature_extractor = FeatureExtractor(is_training=True, img_size=None, model=MODEL_TYPE)
+    feature_extractor = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
 
     # set up detection model
     detection_model = YOLOv2(num_classes=N_CLASSES,
                              anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
                              is_training=False,
                              feature_extractor=feature_extractor,
-                             detector=MODEL_TYPE)
+                             detector=FEATURE_EXTRACTOR)
 
     model = detection_model.model
     model.summary()
@@ -124,7 +123,7 @@ def _main_():
 
     # Set up Tensorboard and Model Backup
     tf_board = TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
-    backup = keras.callbacks.ModelCheckpoint(BACK_UP_PATH + "best_%s-{epoch:02d}-{val_loss:.2f}.weights" % MODEL_TYPE,
+    backup = keras.callbacks.ModelCheckpoint(BACK_UP_PATH + "best_%s-{epoch:02d}-{val_loss:.2f}.weights" % FEATURE_EXTRACTOR,
                                              monitor='val_loss',
                                              save_weights_only=True, save_best_only=True)
 

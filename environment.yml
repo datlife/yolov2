@@ -83,6 +83,7 @@ dependencies:
   - prompt-toolkit==1.0.14
   - protobuf==3.3.0
   - pyparsing==2.2.0
+  - pytest==3.2.2
   - pytz==2017.2
   - pywavelets==0.5.2
   - pyyaml==3.12
