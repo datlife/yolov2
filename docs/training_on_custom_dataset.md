@@ -3,7 +3,9 @@
 
 ## Step 1: Prepares training data
 
-In this project, we only accept training input fil as text file as following format:
+In this project, we create a simple interface which user only needs to create a simple .txt file and the program would handle the rest (generate anchors, categories, dataset prep).
+
+This text file need to following this format
 ```
 path/to/image1.jpg, x1, y1, x2, y2, class_name1
 path/to/image2.jpg, x1, y1, x2, y2, class_name3
@@ -12,10 +14,11 @@ path/to/image3.jpg, x1, y1, x2, y2, class_name4
 path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 ```
 
-Assumption:
-* If one image contains more than one objects, it would be split into multiple lines.
+** Assumption **:
+* Path to image is absolute path
 * `x1, y1, x2, y2` are absolute cooridinates.
-* `class_name` are a string, no space or special characters.
+* `class_name` are a string, no space or special characters. (e.g. `TrafficSign`, `StopSign`)
+* If an image contains more than one object, each object would be split into multiple lines.
         
         
 ## Step 2: Generate dataset for training
@@ -31,10 +34,8 @@ python create_dataset.py
 It will create the following files:
 ```
 yolov2
-|
 |- dataset
      | - my_new_data_set
-         |
          | --  categories.txt
          | --  anchors.txt
          | --  training_data.csv
