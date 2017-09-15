@@ -59,13 +59,14 @@ ANCHORS    = "./dataset/my_new_dataset/anchors.txt"
 
 ## Step 4: Fine-tune for your own dataset
 
-* Training on your own datset
+* Training on your own datset 
 ```
 python train.py  \
-   --epochs        100
-   --batch         8
-   --learning_rate 0.00001
-   --training_data your_own_data.txt 
+   --epochs        100 \
+   --batch         8   \
+   --learning_rate 0.00001 \
+   --training_data /path/to/training_data.csv \
+   --validation-data /path/to/testing_data.csv 
 ```
 
 ## Step 5: Evaluate your trained model on new dataset
