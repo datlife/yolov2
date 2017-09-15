@@ -1,7 +1,7 @@
 # Train on custom data set
 ----------------------------
 
-## Step 1: Prepares training data
+## Step 1: Data Preparation
 
 In this project, we create a simple interface which user only needs to create a simple .txt file and the program would handle the rest (generate anchors, categories, dataset prep).
 
@@ -53,7 +53,7 @@ N_CLASSES          = 61
 N_ANCHORS          = 5
 
 # Map indices to actual label names
-CATEGORIES = "./dataset/my_new_dataset/categories_tree.txt"
+CATEGORIES = "./dataset/my_new_dataset/categories.txt"
 
 # Path to anchors for specific dataset (using K-mean clustering)
 ANCHORS    = "./dataset/my_new_dataset/anchors.txt"
