@@ -1,3 +1,32 @@
+"""
+YOLOv2 Meta-Architecture
+
+        images --> feature extractor --> feature map --> detector --> output feature map
+
+In this file, we define three different detector:
+   * Original YOLOv2 Detector
+   * MobileNet-type detector
+   * DenseNet-type detector
+
+-----------------------
+Example usage: This code will define pretrained YOLOv2 on COCO Dataset (80 classes)
+
+from models.YOLOv2 import YOLOv2
+from models.loss import custom_loss
+from models.FeatureExtractor import FeatureExtractor
+
+# Define YOLOv2 with Darknet-19 as feature extractor and use 'yolov2' as detector
+darknet = FeatureExtractor(img_size=(608, 608, 3), model='yolov2')
+
+yolo    = YOLOv2(num_classes       = 80,
+                 anchors           = np.array(ANCHORS),
+                 feature_extractor = darknet,
+                 detector          = 'yolov2')
+
+# Compile model
+model = yolo.model.compile('adam',loss=custom_loss)
+
+"""
 from zoo.mobilenet import _depthwise_conv_block, relu6
 from zoo.darknet19 import conv_block
 from keras.layers import Lambda, Conv2D, BatchNormalization, Activation
@@ -12,7 +41,7 @@ FINE_GRAINED_LAYERS = {'yolov2': 'leaky_re_lu_13',
 
 def yolov2_detector(feature_extractor, num_classes, num_anchors, fine_grained_layers):
     """
-
+    Original YOLOv2 Implementation
     :param feature_extractor:
     :param num_classes:
     :param num_anchors:
@@ -43,7 +72,7 @@ def yolov2_detector(feature_extractor, num_classes, num_anchors, fine_grained_la
 
 def mobile_detector(feature_extractor, num_classes, num_anchors, fine_grained_layers):
     """
-
+    Mobile Detector Implementation
     :param feature_extractor:
     :param num_classes:
     :param num_anchors:
@@ -77,7 +106,7 @@ def mobile_detector(feature_extractor, num_classes, num_anchors, fine_grained_la
 
 def densenet_detector(feature_extractor, num_classes, num_anchors, fine_grained_layers):
     """
-
+    DenseNet Implementation - For Now I keeped this architecture the same as YOLov2 due to a few incompatibilities
     :param feature_extractor:
     :param num_classes:
     :param num_anchors:
@@ -120,6 +149,9 @@ class YOLOv2(object):
                  detector
                  ):
         """
+        YOLOv2 Meta-Architecture
+
+        images --> feature extractor --> feature map --> detector --> output feature map
 
         :param num_classes:
         :param anchors:
@@ -128,15 +160,17 @@ class YOLOv2(object):
         :param detector:
         """
 
-        self.num_classes = num_classes
-        self.anchors = anchors
-        self._is_training = is_training
+        self.num_classes       = num_classes
+        self.anchors           = anchors
+        self._is_training      = is_training
         self.feature_extractor = feature_extractor
 
         self.fine_grained_layers = FINE_GRAINED_LAYERS[feature_extractor.name]
         self.detector = DETECTOR[detector](feature_extractor, num_classes, len(anchors), self.fine_grained_layers)
 
-        self.model = Model(inputs=feature_extractor.model.input, outputs=self.detector)
+        # YOLOv2 Model
+        self.model = Model(inputs=feature_extractor.model.input,
+                           outputs=self.detector)
 
     def post_process(self):
         pass
