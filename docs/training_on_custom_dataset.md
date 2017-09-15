@@ -14,7 +14,7 @@ path/to/image3.jpg, x1, y1, x2, y2, class_name4
 path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 ```
 
-** Assumption **:
+**Assumption**:
 * Path to image is absolute path
 * `x1, y1, x2, y2` are absolute cooridinates.
 * `class_name` are a string, no space or special characters. (e.g. `TrafficSign`, `StopSign`)
@@ -25,10 +25,10 @@ path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 
 ```
 python create_dataset.py
-   --path       /path/to/text_file.txt
-   --output_dir ./dataset/my_new_dataset
-   --n_anchors   5
-   --split       false
+   --path             /path/to/text_file.txt
+   --output_dir       ./dataset/my_new_dataset
+   --number_anchors   5
+   --split            false
 ```
 
 It will create the following files:
@@ -47,13 +47,15 @@ yolov2
 
 Example:
 ```
-FEATURE_EXTRACTOR     = 'yolov2'
-IMG_INPUT_SIZE = 480
-N_CLASSES      = 61
-N_ANCHORS      = 5
+FEATURE_EXTRACTOR  = 'yolov2'
+IMG_INPUT_SIZE     = 480
+N_CLASSES          = 61
+N_ANCHORS          = 5
 
 # Map indices to actual label names
 CATEGORIES = "./dataset/my_new_dataset/categories_tree.txt"
+
+# Path to anchors for specific dataset (using K-mean clustering)
 ANCHORS    = "./dataset/my_new_dataset/anchors.txt"
 ```
 
