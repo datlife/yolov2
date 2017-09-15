@@ -68,9 +68,9 @@ python train.py  \
    --training_data your_own_data.txt 
 ```
 
-## Step 5: Evaluate your finetuned model
+## Step 5: Evaluate your trained model on new dataset
 ```
-python evaluate.py 
----weights yolov2.weights
----csv_path ./dataset/my_new_dataset/testing_data.csv
+python evaluate.py \
+   ---weights yolov2.weights \
+    ---csv_path ./dataset/my_new_dataset/testing_data.csv
 ```
