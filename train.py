@@ -1,11 +1,16 @@
 """
-Training object detector for YOLOv2.
+Training object detector for YOLOv2 on new dataset.
 
 Assumption:
 ----------
-   * Configuration file `cfg.py` has been setup properly.
-   * A training (optional: validation) CSV file has been generated.
-   * A feature extractor has been pre-trained. Otherwise, it will take a long long for model to converge
+   * Configuration file `cfg.py` has been setup properly, including:
+         + feature extractor type
+         + image size input
+         + number of classes
+         + path to anchors file, categories
+
+   * A training and validation CSV files in correct format have been generated. (could be done through `create_dataset.py`).
+   * A feature extractor has been pre-trained (darknet19, densenet or mobilenet in this case).
 
 Return
 -------
@@ -43,7 +48,7 @@ parser.add_argument('-p', '--train-path',
                     help="Path to CSV training data set", type=str, default=None)
 
 parser.add_argument('-v', '--val-path',
-                    help="Path to CSV testing data set ", type=str, default=None)
+                    help="Path to CSV validation data set ", type=str, default=None)
 
 parser.add_argument('-w', '--weights',
                     help="Path to pre-trained weight files", type=str, default=None)
@@ -95,10 +100,10 @@ def _main_():
 
     # Set up data generator
     train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
-    val_data_gen = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
+    val_data_gen   = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
 
     print("Starting training process\n")
-    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-8"))
+    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
 
     # #################
     # Construct Model #
@@ -108,11 +113,11 @@ def _main_():
     feature_extractor = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
 
     # set up detection model
-    detection_model = YOLOv2(num_classes=N_CLASSES,
-                             anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
-                             is_training=False,
+    detection_model = YOLOv2(num_classes      = N_CLASSES,
+                             anchors          = np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
+                             is_training      = False,
                              feature_extractor=feature_extractor,
-                             detector=FEATURE_EXTRACTOR)
+                             detector         = FEATURE_EXTRACTOR)
 
     model = detection_model.model
     model.summary()
@@ -122,24 +127,24 @@ def _main_():
         model.load_weights(WEIGHTS_FILE, by_name=True)
 
     # Set up Tensorboard and Model Backup
-    tf_board = TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=False)
+    tf_board = TensorBoard(log_dir='./logs', histogram_freq=1, write_graph=True, write_images=False)
     backup = keras.callbacks.ModelCheckpoint(BACK_UP_PATH + "best_%s-{epoch:02d}-{val_loss:.2f}.weights" % FEATURE_EXTRACTOR,
                                              monitor='val_loss',
-                                             save_weights_only=True, save_best_only=True)
+                                             save_weights_only=True,
+                                             save_best_only=True)
 
     # ###################
     # COMPILE AND TRAIN #
     # ###################
     model.compile(optimizer=keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
-    model.fit_generator(generator=train_data_gen,
-                        validation_data=val_data_gen,
-                        steps_per_epoch=int(len(training_dict) / BATCH_SIZE),
-                        validation_steps=int(len(validation_dict) / BATCH_SIZE),
-                        callbacks=[tf_board, backup],
-                        epochs=EPOCHS,
-                        initial_epoch=INITIAL_EPOCH,
-                        workers=3,
-                        verbose=1)
+    model.fit_generator(generator       = train_data_gen,
+                        validation_data = val_data_gen,
+                        steps_per_epoch = int(len(training_dict) / BATCH_SIZE),
+                        validation_steps= int(len(validation_dict) / BATCH_SIZE),
+                        callbacks       = [tf_board, backup],
+                        epochs          = EPOCHS,
+                        initial_epoch   = INITIAL_EPOCH,
+                        workers=3, verbose=1)
 
     model.save_weights('yolov2.weights')
 

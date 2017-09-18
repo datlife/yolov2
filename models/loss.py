@@ -39,8 +39,8 @@ def custom_loss(y_true, y_pred):
     :return: a scalar
             loss value
     """
-    if ENABLE_TREE is True:
-        SOFTMAX_TREE = SoftMaxTree(tree_file=TREE_FILE)
+    if ENABLE_HIERARCHICAL_TREE is True:
+        SOFTMAX_TREE = SoftMaxTree(tree_file=HIERARCHICAL_TREE_PATH)
 
     pred_shape = K.shape(y_pred)[1:3]
     gt_shape = K.shape(y_true)  # shape of ground truth value
@@ -96,7 +96,7 @@ def custom_loss(y_true, y_pred):
     loc_loss    = tf.reduce_mean(tf.reduce_sum(loc_loss, 1))
 
     # NOTE: YOLOv2 does not use cross-entropy loss.
-    if ENABLE_TREE is False:
+    if ENABLE_HIERARCHICAL_TREE is False:
         # Object Confidence Loss
         weight_conf = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
         obj_conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf

@@ -8,13 +8,13 @@ Output:
 
 import keras.backend as K
 import tensorflow as tf
-from cfg import ENABLE_TREE, TREE_FILE
+from cfg import ENABLE_HIERARCHICAL_TREE, HIERARCHICAL_TREE_PATH
 
 
 def post_process(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.5, score_threshold=0.6, mode=2):
-    if ENABLE_TREE is True:
+    if ENABLE_HIERARCHICAL_TREE is True:
         from softmaxtree.Tree import SoftMaxTree
-        softmax_tree = SoftMaxTree(TREE_FILE)
+        softmax_tree = SoftMaxTree(HIERARCHICAL_TREE_PATH)
 
     N_ANCHORS  = len(anchors)
     ANCHORS    = anchors
@@ -55,7 +55,7 @@ def post_process(yolov2, img_shape, n_classes=80, anchors=None, iou_threshold=0.
     boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1],  # Y1 X1
                            box_maxes[..., 1:2], box_maxes[..., 0:1]])  # Y2 X2
 
-    if ENABLE_TREE is False:
+    if ENABLE_HIERARCHICAL_TREE is False:
         box_scores = box_confidence * K.softmax(box_class_probs)
         box_classes = K.argmax(box_scores, -1)
     else:

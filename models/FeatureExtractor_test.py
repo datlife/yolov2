@@ -9,7 +9,7 @@ def _test():
     mobilenet.model.summary()
 
     densenet = FeatureExtractor(is_training=True, img_size=None, model='densenet',
-                                model_path='../weights/densenet201.h5')
+                                model_path='../weights/feature_extractor/densenet201.h5')
     densenet.model.summary()
 
 

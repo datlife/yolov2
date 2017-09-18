@@ -10,9 +10,10 @@ from FeatureExtractor import FeatureExtractor
 IMG_INPUT = 608
 ANCHORS = [(0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434), (7.88282, 3.52778), (9.77052, 9.16828)]
 
-IMG_PATH = '../test_imgs/multiple_stop.jpg'
+
+IMG_PATH   = '../test_imgs/multiple_stop.jpg'
 CATEGORIES = '../dataset/coco/categories.txt'
-WEIGHTS = '../weights/yolo-coco.weights'
+WEIGHTS    = '../weights/yolo-coco.weights'
 
 
 if __name__ == '__main__':
