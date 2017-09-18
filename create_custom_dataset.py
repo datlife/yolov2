@@ -53,8 +53,6 @@ parser.add_argument('-n', '--number_anchors',
 parser.add_argument('-s', '--split',
                     help='Splitting data into training/validation set at ratio 0.8/0.2', type=bool, default=False)
 
-
-
 def main():
   arguments = parser.parse_args()
   path           = arguments.path

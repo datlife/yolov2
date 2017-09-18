@@ -1,6 +1,6 @@
 import argparse
 import os
-
+import re
 import cv2
 import keras.backend as K
 import numpy as np
@@ -9,7 +9,7 @@ import tensorflow as tf
 from models.YOLOv2 import YOLOv2
 from models.FeatureExtractor import FeatureExtractor
 
-from cfg import *
+from cfg import ANCHORS, IMG_INPUT_SIZE, FEATURE_EXTRACTOR, N_CLASSES, CATEGORIES
 from models.post_process import post_process
 from utils.draw_boxes import DrawingBox
 from utils.preprocess_img import preprocess_img
@@ -37,19 +37,26 @@ parser.add_argument('-m', '--mode',
                     help="(Hierachical Tree Only) detection mode: 0 (Traffic Sign) - 1 (Super class) - 2 (Specific Sign)",
                     type=int, default=2)
 
-ANCHORS = np.asarray(ANCHORS).astype(np.float32)
-
 
 def _main_():
+    global ANCHORS
     args = parser.parse_args()
 
-    IMG_PATH = args.path
-    WEIGHTS = args.weights
-    OUTPUT = args.output_path
-    IOU = args.iou
+    IMG_PATH  = args.path
+    WEIGHTS   = args.weights
+    OUTPUT    = args.output_path
+    IOU       = args.iou
     THRESHOLD = args.threshold
-    MODE = args.mode
+    MODE      = args.mode
 
+    with open(ANCHORS, 'r') as f:
+      data = f.read().splitlines()
+      anchors = []
+      for line in data:
+        numbers = re.findall('\d+.\d+', line)
+        anchors.append((float(numbers[0]), float(numbers[1])))
+    ANCHORS = np.array(anchors)
+    print ANCHORS
     if not os.path.isfile(IMG_PATH):
         print("Image path is invalid.")
         exit()
