@@ -7,6 +7,7 @@ This script creates a custom dataset for training and evaluation. It will genera
    + an anchor text file (depending on number of anchors, default = 5)
 
 Requirement:
+-----------
    + a text file, containing ground truths, in this following format:
         path/to/image , x1, y1, x2, y2, label
 
@@ -33,6 +34,7 @@ import csv
 import numpy as np
 from PIL import Image
 from utils.box import box_iou, Box
+from cfg import IMG_INPUT_SIZE, SHRINK_FACTOR
 from sklearn.model_selection import train_test_split
 
 from argparse import ArgumentParser
@@ -52,9 +54,8 @@ parser.add_argument('-s', '--split',
                     help='Splitting data into training/validation set at ratio 0.8/0.2', type=bool, default=False)
 
 
+
 def main():
-  IMG_INPUT = 608
-  SHRINK_FACTOR =32
   arguments = parser.parse_args()
   path           = arguments.path
   output_dir     = arguments.output_dir
@@ -78,7 +79,7 @@ def main():
         with Image.open(img_path) as img:
             img_width, img_height = img.size
 
-        aspect_ratio = [IMG_INPUT / float(img_width), IMG_INPUT / float(img_height)]
+        aspect_ratio = [IMG_INPUT_SIZE / float(img_width), IMG_INPUT_SIZE / float(img_height)]
         box = Box(0, 0, float(w) * aspect_ratio[0] / SHRINK_FACTOR, float(h) * aspect_ratio[1] / SHRINK_FACTOR)
         gt_boxes.append(box)
 
@@ -87,23 +88,26 @@ def main():
           id += 1
 
     anchors, avg_iou = k_mean_cluster(number_anchors, gt_boxes)
-    print("K = : {:2} | AVG_IOU:{:-4f} ".format(number_anchors, avg_iou))
-
-    print("Done!")
+    print("Number of anchors: {:2} | Average IoU:{:-4f}\n\n ".format(number_anchors, avg_iou))
 
   categories_file = os.path.join(output_dir, 'categories.txt')
   anchors_file    = os.path.join(output_dir, 'anchors.txt')
+
+  if not os.path.isdir(output_dir):
+    os.mkdir(output_dir)
+
   with open(categories_file, 'w') as f:
     for item in categories.items():
-      f.write(item[0])
+      f.write(item[0]+'\n')
 
-  with open(anchors_file,'w') as f:
+  with open(anchors_file, 'w') as f:
     for anchor in anchors:
-      f.write(anchor)
+      f.write("({:5f}, {:5f})\n".format(anchor.w, anchor.h))
 
   # ###################################
   # Generate Training/Validation data #
   # ###################################
+  print('Generating data..')
   if split is True:
     with open(path) as txt_file:
       x = txt_file.read().splitlines()[1:]
@@ -117,7 +121,9 @@ def main():
   else:
     with open(path) as txt_file:
       data = txt_file.read().splitlines()
-      save_dataset(data, 'training_data.csv')
+      training_path = os.path.join(output_dir,  'training_data.csv')
+      save_dataset(data, training_path)
+  print('Done')
 
 
 def convert_edges_to_centroid(x1, y1, x2, y2):
@@ -142,7 +148,7 @@ def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
   """
   Cluster anchors.
   """
-  # initial random centroids
+  # initialize random centroids
   centroid_indices = np.random.choice(len(gt_boxes), n_anchors)
   centroids = []
   for centroid_index in centroid_indices:
@@ -161,22 +167,22 @@ def k_mean_cluster(n_anchors, gt_boxes, loss_convergence=1e-5):
 
 
 def run_k_mean(n_anchors, boxes, centroids):
-  """Perform K-mean clustering on training ground truth to generate anchors.
+  '''
+  Perform K-mean clustering on training ground truth to generate anchors.
   In the paper, authors argues that generating anchors through anchors would improve Recall of the network
 
   NOTE: Euclidean distance produces larger errors for larger boxes. Therefore, YOLOv2 did not use Euclidean distance
         to measure calculate loss. Instead, it uses the following formula:
+        d(box, centroid)= 1 - IoU (box, centroid)
 
-                  d(box, centroid) = 1−IOU(box, centroid)
-
-  :param n_anchors: K-value , number of desired anchors box
-  :param boxes:      list of bounding box in format [x1, y1, w, h]
+  :param n_anchors:
+  :param boxes:
   :param centroids:
   :return:
       new_centroids: set of new anchors
       groups:        wth?
       loss:          compared to current bboxes
-  """
+  '''
   loss = 0
   groups = []
   new_centroids = []
@@ -213,7 +219,6 @@ def run_k_mean(n_anchors, boxes, centroids):
       counter += 1
 
   avg_iou = iou / counter
-  # print("Average IOU: {:4f}".format(avg_iou))
   return new_centroids, avg_iou, loss
 
 if __name__ == '__main__':

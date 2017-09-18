@@ -35,9 +35,11 @@ def save_lisa_to_txt(csv_path, save_file='./training.txt'):
     df = pd.concat([image_paths, labels], axis=1)
     data_file_path  = os.path.join(csv_path, save_file)
     categories_path = os.path.join(csv_path, 'categories.txt')
+
     # Save training data
     np.savetxt(data_file_path, df.values, delimiter=',', fmt='%s')
     print("A text file has been created at {}/{}".format(csv_path,  save_file))
+
     # Save labels in to categories.txt
     labels = df['Annotation tag'].unique()
     np.savetxt(categories_path, labels, delimiter=',', fmt='%s')

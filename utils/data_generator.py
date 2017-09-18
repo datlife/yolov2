@@ -62,8 +62,8 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
     :return:
     """
     slices   = int(len(training_instances)/batch_size)
-    if ENABLE_TREE is True:
-        hier_tree = SoftMaxTree(tree_file=TREE_FILE)
+    if ENABLE_HIERARCHICAL_TREE is True:
+        hier_tree = SoftMaxTree(tree_file=HIERARCHICAL_TREE_PATH)
 
     # Shuffle data
     keys = training_instances.keys()
@@ -102,7 +102,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                     bbox, label = obj    # convert label to int
                     index = np.where(CLASSES == label)[0][0]
 
-                    if ENABLE_TREE is False:
+                    if ENABLE_HIERARCHICAL_TREE is False:
                         one_hot = np.eye(N_CLASSES)[index]
                     else:
                         one_hot = hier_tree.encode_label(index)

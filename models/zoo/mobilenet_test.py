@@ -6,7 +6,7 @@ from mobilenet import mobile_net, preprocess_input
 
 # Set up model
 mobilenet = mobile_net(input_size=(224, 224, 3), include_top=True)
-mobilenet.load_weights('../../weights/mobilenet.h5')
+mobilenet.load_weights('../../weights/feature_extractors/mobilenet_1_0_224_tf.h5')
 mobilenet.summary()
 
 

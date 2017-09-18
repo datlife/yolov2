@@ -5,7 +5,7 @@ from decode_imagenet import decode_predictions
 
 # Set up model
 darknet = darknet19(input_size=(448, 448, 3), include_top=True)
-darknet.load_weights('../../weights/darknet19_448.weights')
+darknet.load_weights('../../weights/feature_extractors/darknet19_448.h5')
 darknet.summary()
 
 

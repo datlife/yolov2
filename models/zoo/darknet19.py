@@ -19,7 +19,7 @@ def yolo_preprocess_input(x):
 
 def darknet19(input_size=None, num_classes=1000, include_top=True):
     """
-
+    DarkNet-19 Architecture Definition
     :param input_size:
     :param num_classes:
     :param pretrained_weights:
@@ -58,7 +58,7 @@ def darknet19(input_size=None, num_classes=1000, include_top=True):
     x = conv_block(x, 512, (1, 1))
     x = conv_block(x, 1024, (3, 3))
     x = conv_block(x, 512, (1, 1))
-    x = conv_block(x, 1024, (3, 3))
+    x = conv_block(x, 1024, (3, 3))    # ---> feature extraction ends here
 
     if include_top:
         x = Conv2D(num_classes, (1, 1), activation='linear', padding='same')(x)
