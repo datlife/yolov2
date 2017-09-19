@@ -1,14 +1,20 @@
 """
-Convert LISA csv annotation data set to txt format as following:
+Convert LISA csv annotation data set to txt format:
 
-Text file Format:
----------
-abs_image_path, x1, y1, x2, y2, label
 Usage:
 -----
-python process_lisa.py -p ../lisa/training
+python convert_lisa_to_txt.py -p ../lisa/training
 
-It will create a text file 'training.txt' for training on YOLOv2
+Return
+------
+It will create a text file:
+    + 'training.txt'
+    + 'categories.txt'
+
+Next step
+---------
+Read create_custom_dataset.py
+
 """
 import pandas as pd
 import os

@@ -73,15 +73,15 @@ def _main_():
     # ###############
     # PARSE CONFIG  #
     # ###############
-    args = parser.parse_args()
+    args          = parser.parse_args()
     training_path = args.train_path
-    val_path = args.val_path
-    WEIGHTS_FILE = args.weights
-    BATCH_SIZE = args.batch
-    EPOCHS = args.epochs
+    val_path      = args.val_path
+    WEIGHTS_FILE  = args.weights
+    BATCH_SIZE    = args.batch
+    EPOCHS        = args.epochs
     LEARNING_RATE = args.learning_rate  # this model has been pre-trained, LOWER LR is needed
     INITIAL_EPOCH = args.initial_epoch
-    BACK_UP_PATH = args.backup
+    BACK_UP_PATH  = args.backup
 
     if not os.path.exists(BACK_UP_PATH):
         os.makedirs(BACK_UP_PATH)
@@ -90,7 +90,7 @@ def _main_():
     # ###############
     # PREPARE DATA  #
     # ###############
-    # Read training input
+    # Read training input (a CSV file)
     data = parse_inputs(training_path)
     validation_dict = parse_inputs(val_path)
 
@@ -101,9 +101,6 @@ def _main_():
     # Set up data generator
     train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
     val_data_gen   = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
-
-    print("Starting training process\n")
-    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
 
     # #################
     # Construct Model #
@@ -121,6 +118,9 @@ def _main_():
 
     model = detection_model.model
     model.summary()
+
+    print("Starting training process\n")
+    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
 
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:

@@ -68,7 +68,7 @@ def main():
     categories     = {}
 
     lines = f.readlines()
-    print("Calculating Anchors....")
+    print("Calculating Anchors using K-mean Clustering....")
     id = 0
     for line in lines:
         img_path, x1, y1, x2, y2, label = line.rstrip().split(",")

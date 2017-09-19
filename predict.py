@@ -39,9 +39,10 @@ parser.add_argument('-m', '--mode',
 
 
 def _main_():
-    global ANCHORS
+    # ###############
+    # Parse Config  #
+    # ###############
     args = parser.parse_args()
-
     IMG_PATH  = args.path
     WEIGHTS   = args.weights
     OUTPUT    = args.output_path
@@ -49,14 +50,14 @@ def _main_():
     THRESHOLD = args.threshold
     MODE      = args.mode
 
+    # Config Anchors
+    anchors = []
     with open(ANCHORS, 'r') as f:
       data = f.read().splitlines()
-      anchors = []
       for line in data:
         numbers = re.findall('\d+.\d+', line)
         anchors.append((float(numbers[0]), float(numbers[1])))
-    ANCHORS = np.array(anchors)
-    print ANCHORS
+
     if not os.path.isfile(IMG_PATH):
         print("Image path is invalid.")
         exit()
@@ -69,34 +70,49 @@ def _main_():
         class_names = [c.strip() for c in txt_file.readlines()]
 
     with tf.Session() as sess:
-        darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
-        yolo = YOLOv2(num_classes=N_CLASSES,
-                      anchors=np.array(ANCHORS),
-                      is_training=False,
+
+        # #################
+        # Construct Graph #
+        # #################
+        darknet = FeatureExtractor(is_training=False, img_size=None, model=FEATURE_EXTRACTOR)
+        yolo = YOLOv2(num_classes      = N_CLASSES,
+                      anchors          = np.array(anchors),
+                      is_training      = False,
                       feature_extractor=darknet,
-                      detector=FEATURE_EXTRACTOR)
+                      detector         = FEATURE_EXTRACTOR)
+
         yolov2 = yolo.model
         yolov2.load_weights(WEIGHTS)
 
         img_shape = K.placeholder(shape=(2,))
 
-        # Start prediction
-        boxes, classes, scores = post_process(yolov2, img_shape, n_classes=N_CLASSES, anchors=ANCHORS,
-                                              iou_threshold=IOU,
-                                              score_threshold=THRESHOLD,
-                                              mode=MODE)
+        boxes, classes, scores = post_process(yolov2, img_shape,
+                                              n_classes      = N_CLASSES,
+                                              anchors        = np.array(anchors),
+                                              iou_threshold  = IOU,
+                                              score_threshold= THRESHOLD,
+                                              mode           = MODE)
+        # #####################
+        # Process Image Input #
+        # #####################
 
         orig_img = cv2.cvtColor(cv2.imread(IMG_PATH), cv2.COLOR_BGR2RGB)
         height, width, _ = orig_img.shape
         img = preprocess_img(cv2.resize(orig_img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE)))
         img = np.expand_dims(img, 0)
 
+        # #################
+        # Make Prediction #
+        # #################
         pred_bboxes, pred_classes, pred_scores = sess.run([boxes, classes, scores],
                                                           feed_dict={
                                                               yolov2.input: img,
                                                               img_shape: [height, width],
                                                               K.learning_phase(): 0
                                                           })
+        # #################
+        # Display Result  #
+        # #################
         bboxes = []
         for box, cls, score in zip(pred_bboxes, pred_classes, pred_scores):
             y1, x1, y2, x2 = box

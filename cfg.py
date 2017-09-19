@@ -1,6 +1,5 @@
 '''
 Main configuration file for YOLOv2 Project.
-
 Modify every time one would like to train on a new dataset
 '''
 
@@ -14,7 +13,7 @@ FEATURE_EXTRACTOR     = 'yolov2'
 CATEGORIES = "/home/dat/Documents/yolov2/dataset/coco/categories.txt"
 ANCHORS    = "/home/dat/Documents/yolov2/dataset/coco/anchors.txt"
 
-# OPTIONAL -  HIERARCHICAL TREE - Please disabled if training on your custom data (or look at lisa.tree on how to setup)
+# OPTIONAL -  HIERARCHICAL TREE - Disabled if training on your custom data (or look at lisa.tree on how to setup)
 ENABLE_HIERARCHICAL_TREE = False
 HIERARCHICAL_TREE_PATH   = "/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree"
 

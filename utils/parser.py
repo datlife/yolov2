@@ -35,16 +35,3 @@ def parse_inputs(txt_file):
                 training_instances[img_path] = [an_object]
 
     return training_instances
-
-# Test new parse input
-if __name__ == "__main__":
-    from scripts.split_dataset import split_data
-    training, testing = split_data('../training.txt', ratio=0.2)
-    training_data = parse_inputs(training)
-    import random
-    keys = training_data.keys()
-    shuffled_keys = random.sample(keys, len(keys))
-    for key in shuffled_keys:
-        if len(training_data[key]) > 1:
-            print(key, training_data[key])
-    print("Total images: ", len(training_data))

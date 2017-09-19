@@ -18,7 +18,7 @@ from utils.data_generator import flow_from_list
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
 
 parser.add_argument('-p', '--path', help="Path to training text file ",
-                    type=str, default='./dataset/combined_lisa/training.txt')
+                    type=str, default=None)
 
 parser.add_argument('-w', '--weights', help="Path to pre-trained weight files",
                     type=str, default=None)
@@ -41,6 +41,7 @@ LEARNING_RATE   = args.learning_rate  # this model has been pre-trained, LOWER L
 
 
 def _main_():
+
     # ###################
     # PREPARE DATA INPUT
     # ###################
