@@ -7,11 +7,11 @@ In this project, we create a simple interface which user only needs to create a 
 
 This text file need to following this format
 ```
-path/to/image1.jpg, x1, y1, x2, y2, class_name1
-path/to/image2.jpg, x1, y1, x2, y2, class_name3
-path/to/image3.jpg, x1, y1, x2, y2, class_name4
+/absolute/path/to/image1.jpg, x1, y1, x2, y2, class_name1
+/absolute/path/to/image2.jpg, x1, y1, x2, y2, class_name3
+/absolute/path/to/image3.jpg, x1, y1, x2, y2, class_name4
 ...
-path/to/imagen.jpg, x1, y2, x2, y2, class_name6
+/absolute/path/to/imagen.jpg, x1, y2, x2, y2, class_name6
 ```
 
 **Assumption**:
@@ -28,7 +28,7 @@ python create_dataset.py
    --path             /path/to/text_file.txt
    --output_dir       ./dataset/my_new_dataset
    --number_anchors   5
-   --split            false
+   --split            True
 ```
 
 It will create the following files:
@@ -39,7 +39,7 @@ yolov2
          | --  categories.txt
          | --  anchors.txt
          | --  training_data.csv
-         | --  testing_data.csv   # if split is enabled
+         | --  validation_data.csv   
 ```
 
 
@@ -48,8 +48,8 @@ yolov2
 Example:
 ```
 FEATURE_EXTRACTOR  = 'yolov2'
-IMG_INPUT_SIZE     = 480
-N_CLASSES          = 61
+IMG_INPUT_SIZE     = 608
+N_CLASSES          = 31
 N_ANCHORS          = 5
 
 # Map indices to actual label names
