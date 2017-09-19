@@ -9,15 +9,15 @@ This script creates a custom dataset for training and evaluation. It will genera
 Requirement:
 -----------
    + a text file, containing ground truths, in this following format:
-        path/to/image , x1, y1, x2, y2, label
+        /absolute_path/to/image , x1, y1, x2, y2, label
 
-Example:
--------
+Example usage:
+-------------
 python create_custom_dataset.py
  --path       /path/to/text_file.txt
  --output_dir ./dataset/my_new_dataset
  --num_anchors   5
- --split       false
+ --split       True
 
 Return
 ------
@@ -27,7 +27,7 @@ Return
          | --  categories.txt
          | --  anchors.txt
          | --  training_data.csv
-         | --  testing_data.csv   # if split is enabled
+         | --  testing_data.csv
 """
 import os
 import csv
@@ -52,6 +52,7 @@ parser.add_argument('-n', '--number_anchors',
 
 parser.add_argument('-s', '--split',
                     help='Splitting data into training/validation set at ratio 0.8/0.2', type=bool, default=False)
+
 
 def main():
   arguments = parser.parse_args()

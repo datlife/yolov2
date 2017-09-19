@@ -11,18 +11,22 @@ Output:
 Loss of YOLOv2 Implementation. Few Notes
     * What we get from the CNN is a feature map (imagine as a 3-D box)
     * Each cell in a feature map is a vector size N_ANCHORS* (5 + N_CLASSES)  as:
-            eg. one cell
-            ------------- ANCHOR 1---------------  -------- ANCHORS 2 -------------  ...... ------------ANCHOR N -----------
-            [tx, ty, tw, th, to , label_vector..],[tx1, ty1, tw1, th1, label_vector]......[tx_n, ty_n, tw_n, th_m, label...]
+
+        ------------- ANCHOR 1---------------  -------- ANCHORS 2 -------------  ...... ------------ANCHOR N -----------
+        [tx, ty, tw, th, to , label_vector..],[tx1, ty1, tw1, th1, label_vector]......[tx_n, ty_n, tw_n, th_m, label...]
+        ----------------------------------------------------------------------------------------------------------------
+                                                 One cell in a feature map
+
+
             * tx, ty : predicts of relative center of bounding box to its current cell. Therefore, true center points of
-              a prediction would be :
-                        xc = sigmoid(tx) + cx
-                        yc = sigmoid(ty) + cy
+                       a prediction would be :
+                            xc = sigmoid(tx) + cx
+                            yc = sigmoid(ty) + cy
             * tw, th: predicts the scaling value for true width and height of the bounding box based on the anchor as:
-                        w   = exp(tw) * px
-                        h   = exp(th) * py
-            * to : objectiveness of the cell : the probability of having an object in the cell
-            * label_vector: classification vector to calculate soft-max
+                            w   = exp(tw) * px
+                            h   = exp(th) * py
+            * to :     objectiveness of the cell : the probability of having an object in the cell
+            * label:   classification vector to calculate soft-max
 """
 import numpy as np
 import tensorflow as tf
