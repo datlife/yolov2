@@ -29,6 +29,7 @@ python train.py \
 
 """
 import os
+import re
 import random
 import numpy as np
 from argparse import ArgumentParser
@@ -83,6 +84,15 @@ def _main_():
     INITIAL_EPOCH = args.initial_epoch
     BACK_UP_PATH  = args.backup
 
+    # Config Anchors
+    anchors = []
+    with open(ANCHORS, 'r') as f:
+      data = f.read().splitlines()
+      for line in data:
+        numbers = re.findall('\d+.\d+', line)
+        anchors.append((float(numbers[0]), float(numbers[1])))
+    anchors = np.array(anchors)
+
     if not os.path.exists(BACK_UP_PATH):
         os.makedirs(BACK_UP_PATH)
         print("A backup directory has been created")
@@ -111,7 +121,7 @@ def _main_():
 
     # set up detection model
     detection_model = YOLOv2(num_classes      = N_CLASSES,
-                             anchors          = np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
+                             anchors          = anchors * (IMG_INPUT_SIZE / 608),
                              is_training      = False,
                              feature_extractor=feature_extractor,
                              detector         = FEATURE_EXTRACTOR)
@@ -121,7 +131,7 @@ def _main_():
 
     print("Starting training process\n")
     print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
-
+s
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
         model.load_weights(WEIGHTS_FILE, by_name=True)
