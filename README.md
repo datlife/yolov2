@@ -23,14 +23,14 @@ conda install -c menpo opencv=2.4.11
 
 ## Usage
 
-* Download weight files. 
+* Download weight files. (not working yet)
 ```
 python weights/download_weights.py
 ```
 
 * Detect objects in a given image using original YOLOv2
 ```
-python predict.py --weight_path yolov2.weights test_image.jpg 
+python predict.py -p ./test_imgs/multiple_stop.jpg -w ./weights/yolo-coco.weights -o ./
 ```
 
 ## TODO List:
