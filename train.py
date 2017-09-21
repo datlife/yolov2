@@ -131,7 +131,7 @@ def _main_():
 
     print("Starting training process\n")
     print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
-s
+
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
         model.load_weights(WEIGHTS_FILE, by_name=True)
