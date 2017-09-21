@@ -72,8 +72,8 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
     while True:
         for i in list(range(slices)):
             instances = shuffled_keys[i * batch_size:(i * batch_size) + batch_size]
-            x_batch = np.zeros((batch_size, IMG_INPUT, IMG_INPUT, 3))
-            y_batch = np.zeros((batch_size, IMG_INPUT/SHRINK_FACTOR, IMG_INPUT/SHRINK_FACTOR, N_ANCHORS, 5 + N_CLASSES))
+            x_batch = np.zeros((batch_size, IMG_INPUT_SIZE, IMG_INPUT_SIZE, 3))
+            y_batch = np.zeros((batch_size, IMG_INPUT_SIZE/SHRINK_FACTOR, IMG_INPUT_SIZE/SHRINK_FACTOR, N_ANCHORS, 5 + N_CLASSES))
 
             for i, instance in enumerate(instances):
                 filename    = instance
@@ -88,14 +88,14 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                 except IOError:
                     raise IOError("Check input filename. ")
 
-                grid_w = IMG_INPUT / SHRINK_FACTOR
-                grid_h = IMG_INPUT / SHRINK_FACTOR
+                grid_w = IMG_INPUT_SIZE / SHRINK_FACTOR
+                grid_h = IMG_INPUT_SIZE / SHRINK_FACTOR
 
                 if augmentation:
                     img, objects = augment_img(img, objects)
 
                 processed_img = preprocess_img(img)
-                aug_img = cv2.resize(processed_img, (IMG_INPUT, IMG_INPUT))
+                aug_img = cv2.resize(processed_img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE))
 
                 x_batch[i] = aug_img
                 for obj in objects:
@@ -118,7 +118,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                     if r < grid_w and c < grid_h:
                         y_batch[i, c, r, :, :] = N_ANCHORS * [object_mask]    # Construct Feature map ground truth
 
-            yield x_batch, y_batch.reshape([batch_size,  IMG_INPUT/SHRINK_FACTOR, IMG_INPUT/SHRINK_FACTOR, N_ANCHORS*(5 + N_CLASSES)])
+            yield x_batch, y_batch.reshape([batch_size,  IMG_INPUT_SIZE/SHRINK_FACTOR, IMG_INPUT_SIZE/SHRINK_FACTOR, N_ANCHORS*(5 + N_CLASSES)])
 
 
 def calc_augment_level(y, scaling_factor=5):
