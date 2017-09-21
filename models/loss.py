@@ -28,6 +28,7 @@ Loss of YOLOv2 Implementation. Few Notes
             * to :     objectiveness of the cell : the probability of having an object in the cell
             * label:   classification vector to calculate soft-max
 """
+import re
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
@@ -46,6 +47,15 @@ def custom_loss(y_true, y_pred):
     if ENABLE_HIERARCHICAL_TREE is True:
         SOFTMAX_TREE = SoftMaxTree(tree_file=HIERARCHICAL_TREE_PATH)
 
+    # Config Anchors
+    anchors = []
+    with open(ANCHORS, 'r') as f:
+      data = f.read().splitlines()
+      for line in data:
+        numbers = re.findall('\d+.\d+', line)
+        anchors.append((float(numbers[0]), float(numbers[1])))
+    anchors = np.array(anchors)
+
     pred_shape = K.shape(y_pred)[1:3]
     gt_shape = K.shape(y_true)  # shape of ground truth value
     GRID_H = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
@@ -60,7 +70,7 @@ def custom_loss(y_true, y_pred):
 
     # Scale anchors to correct aspect ratio
     pred_box_xy   = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-    pred_box_wh   = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(ANCHORS, [1, 1, 1, N_ANCHORS, 2]) / output_size
+    pred_box_wh   = tf.exp(y_pred[:, :, :, :, 2:4]) * np.reshape(anchors, [1, 1, 1, N_ANCHORS, 2]) / output_size
     pred_box_wh   = tf.sqrt(pred_box_wh)
     pred_box_conf = tf.sigmoid(y_pred[:, :, :, :, 4:5])
     pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
