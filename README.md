@@ -23,7 +23,7 @@ conda install -c menpo opencv=2.4.11
 
 ## Usage
 
-* Download weight files. (not working yet) and place under `weights` directory
+* Download weight files and place under `weights` directory
 
 ```
 https://drive.google.com/open?id=0ByoFGh573uhzWGx0aXNNNkY5Qms
