@@ -6,12 +6,6 @@ Input:
 lisa.tree
 """
 import numpy as np
-import tensorflow as tf
-import keras.backend as K
-from cfg import N_CLASSES, N_ANCHORS
-# Show a structure of a tree
-# Each node has the following [name, parent] - index is inferred from the order of this list
-
 
 class Node(object):
 
@@ -83,65 +77,13 @@ class SoftMaxTree(object):
             An encoded label vector
         '''
         encoded_label = np.eye(len(self.tree_dict))[index]
-
-        # Enable parent node
+        # Set parent node to 1.0
         parent_id = self.tree_dict[index].parent.id
         encoded_label[parent_id] = 1.0
         return encoded_label
 
-    def calculate_softmax(self, idx, logits, labels, pred_obj_conf, true_obj_conf):
-        """
-        Update Probabilities of each labels accordingly to Hierarchical Structure
-        :param idx:   default = -1 / starting from root of soft-max tree
-        :param logits:
-        :param labels:
-        :return:
-        """
-        loss = 0.0
-        gt_shape = tf.shape(labels)[1:3]
-        GRID_W, GRID_H = gt_shape[0], gt_shape[1]
-
-        if idx == 0:
-            # Object Confidence Loss
-            weight_conf = 0.5 * (1. - true_obj_conf) + 5.0 * true_obj_conf
-            loss = tf.pow(true_obj_conf - pred_obj_conf, 2) * weight_conf
-            loss = tf.reshape(loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS])
-            loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
-
-        if self.tree_dict[idx].children:   # traverse until reaching the leaf
-            weights_prob = tf.concat(len(self.tree_dict[idx].children) * [true_obj_conf], 4)
-            first_child = self.tree_dict[idx].children[0].id
-
-            sub_logits = logits[..., first_child:first_child + len(self.tree_dict[idx].children)]
-            sub_label = labels[..., first_child:first_child + len(self.tree_dict[idx].children)]
-
-            # # Calculate Parent Probability
-            if idx == 0:
-                sub_logits = pred_obj_conf * tf.nn.softmax(sub_logits)
-            else:
-                parent = self.tree_dict[idx].parent.children[0].id
-                parent_softmax = tf.nn.softmax(logits[..., parent: parent + len(self.tree_dict[idx].parent.children)])
-                parent_softmax = pred_obj_conf * parent_softmax
-
-                for i, child in enumerate(self.tree_dict[idx].parent.children):
-                    if child.id == idx:
-                        parent_prob = parent_softmax[..., i:i + 1]
-                        sub_logits = parent_prob * tf.nn.softmax(sub_logits)
-                        break
-
-            sub_loss = tf.pow(sub_label - sub_logits, 2) * weights_prob
-            sub_loss = tf.reshape(sub_loss, [-1, GRID_H * GRID_W * N_ANCHORS * (len(self.tree_dict[idx].children))])
-            sub_loss = tf.reduce_mean(tf.reduce_sum(sub_loss, 1))
-            loss += sub_loss
-
-            # Calculate loss of each children
-            for children in self.tree_dict[idx].children:
-                sub_loss = self.calculate_softmax(idx=children.id, logits=logits, labels=labels,
-                                                  pred_obj_conf=pred_obj_conf, true_obj_conf=true_obj_conf)
-                loss += sub_loss
-        return loss
 
 # Test
 if __name__ == "__main__":
-    tree = SoftMaxTree(tree_file='../dataset/combined_lisa/lisa.tree')
+    tree = SoftMaxTree(tree_file='/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree')
     print(tree.tree_dict[0])

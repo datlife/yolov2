@@ -6,6 +6,7 @@ MODEL_ZOO = {'yolov2':    darknet19,
              'mobilenet': mobile_net,
              'densenet':  densenet}
 
+
 preprocessor = {'yolov2':    yolo_preprocess_input,
                 'densenet':  yolo_preprocess_input,
                 'mobilenet': preprocess_input}

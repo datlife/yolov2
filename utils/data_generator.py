@@ -55,14 +55,15 @@ def threadsafe_generator(f):
 
 
 @threadsafe_generator
-def flow_from_list(training_instances, batch_size=32, augmentation=False):
+def flow_from_list(training_instances, batch_size=32, augmentation=False, use_tree=False):
     """
     :param training_instances:
     :param batch_size:
     :return:
     """
     slices   = int(len(training_instances)/batch_size)
-    if ENABLE_HIERARCHICAL_TREE is True:
+
+    if use_tree is True:
         hier_tree = SoftMaxTree(tree_file=HIERARCHICAL_TREE_PATH)
 
     # Shuffle data
@@ -81,10 +82,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                 try:
                     img = cv2.imread(filename)
                     height, width, _ = img.shape
-                    if np.array_equal(img[:, :, 0], img[:, :, 1]) and np.array_equal(img[:, :, 1], img[:, :, 2]):  # Gray-scale image
-                        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-                    else:
-                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 except IOError:
                     raise IOError("Check input filename. ")
 
@@ -102,7 +100,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False):
                     bbox, label = obj    # convert label to int
                     index = np.where(CLASSES == label)[0][0]
 
-                    if ENABLE_HIERARCHICAL_TREE is False:
+                    if use_tree is False:
                         one_hot = np.eye(N_CLASSES)[index]
                     else:
                         one_hot = hier_tree.encode_label(index)

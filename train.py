@@ -70,6 +70,12 @@ parser.add_argument('-lr', '--learning_rate',
                     type=float, default=0.00001)
 
 
+DEFAULT_FEATURE_EXTRACTORS_WEIGHTS = {
+    'yolov2': './weights/feature_extractors/darknet19_448.weights',
+    'mobilenet': './weights/feature_extractors/mobilenet.h5',
+    'densenet': './weights/feature_extractors/densenet201.h5',
+}
+
 def _main_():
     # ###############
     # PARSE CONFIG  #
@@ -109,8 +115,8 @@ def _main_():
     training_dict = dict([(key, data[key]) for key in shuffled_keys])
 
     # Set up data generator
-    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True)
-    val_data_gen   = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False)
+    train_data_gen = flow_from_list(training_dict, batch_size=BATCH_SIZE, augmentation=True, use_tree=False)
+    val_data_gen   = flow_from_list(validation_dict, batch_size=BATCH_SIZE, augmentation=False, use_tree=False)
 
     # #################
     # Construct Model #
@@ -119,19 +125,22 @@ def _main_():
     # set up feature extractor
     feature_extractor = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
 
+    if FEATURE_EXTRACTOR in DEFAULT_FEATURE_EXTRACTORS_WEIGHTS \
+            and WEIGHTS_FILE is None:
+        feature_extractor.model.load_weights(DEFAULT_FEATURE_EXTRACTORS_WEIGHTS[FEATURE_EXTRACTOR], by_name=True)
+
+    for l in feature_extractor.model.layers:
+        l.trainable = False
+
     # set up detection model
     detection_model = YOLOv2(num_classes      = N_CLASSES,
-                             anchors          = anchors * (IMG_INPUT_SIZE / 608),
-                             is_training      = False,
-                             feature_extractor=feature_extractor,
-                             detector         = FEATURE_EXTRACTOR)
+                             anchors          = anchors * float((IMG_INPUT_SIZE / 608.)),
+                             is_training      = True,
+                             feature_extractor= feature_extractor,
+                             detector         = FEATURE_EXTRACTOR,
+                             use_hierarchical_tree=False)
 
     model = detection_model.model
-    model.summary()
-
-    print("Starting training process\n")
-    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
-
     # Load pre-trained file if one is available
     if WEIGHTS_FILE:
         model.load_weights(WEIGHTS_FILE, by_name=True)
@@ -146,7 +155,13 @@ def _main_():
     # ###################
     # COMPILE AND TRAIN #
     # ###################
-    model.compile(optimizer=keras.optimizers.Adam(lr=LEARNING_RATE), loss=custom_loss)
+    model.summary()
+    print("Starting training process\n")
+    print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(LEARNING_RATE, BATCH_SIZE, "Adam", "5e-4"))
+    print("Number of classes: %s" % N_CLASSES)
+    print("Number of anchors: %s" % len(anchors))
+
+    model.compile(optimizer=keras.optimizers.Adam(lr=LEARNING_RATE), loss=detection_model.loss_func)
     model.fit_generator(generator       = train_data_gen,
                         validation_data = val_data_gen,
                         steps_per_epoch = int(len(training_dict) / BATCH_SIZE),
