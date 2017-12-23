@@ -4,7 +4,7 @@ MobileNet Implementation in Keras
 Author: https://github.com/fchollet/keras/blob/master/keras/applications/mobilenet.py
 """
 import keras.backend as K
-from keras.layers import Input, InputSpec
+from keras.layers import InputSpec
 from keras.layers import Conv2D
 from keras.layers import BatchNormalization
 from keras.layers import Activation
@@ -14,22 +14,16 @@ from keras import initializers, regularizers, constraints
 from keras.utils import conv_utils
 
 
-def preprocess_input(x):
-    x = x / 255.
-    x -= 0.5
-    x *= 2.
-    return x
+def relu6(x):
+    return K.relu(x, max_value=6)
 
 
-def mobile_net(input_size=(224, 224, 3), include_top=True, n_classes=1000, alpha=1.0, depth_multiplier=1):
-    if input_size is None:
-        img_input = Input(shape=(None, None, 3))
-    else:
-        img_input = Input(shape=input_size)
+def mobile_net(inputs, include_top=False, n_classes=1000, alpha=1.0, depth_multiplier=1):
 
+    fine_grained_layers = []
     shape = (1, 1, int(1024 * alpha))
 
-    x = _conv_block(img_input, 32, alpha, strides=(2, 2))
+    x = _conv_block(inputs, 32, alpha, strides=(2, 2))
     x = _depthwise_conv_block(x, 64,  alpha, depth_multiplier, block_id=1)
     x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=2, strides=(2, 2))
     x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=3)
@@ -41,6 +35,7 @@ def mobile_net(input_size=(224, 224, 3), include_top=True, n_classes=1000, alpha
     x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=9)
     x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=10)
     x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=11)
+    fine_grained_layers.append(x)
 
     x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=12, strides=(2, 2))
     x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=13)
@@ -53,13 +48,9 @@ def mobile_net(input_size=(224, 224, 3), include_top=True, n_classes=1000, alpha
         x = Conv2D(n_classes, (1, 1), padding='same', name='conv_preds')(x)
         x = Activation('softmax', name='act_softmax')(x)
         x = Reshape((n_classes,), name='reshape_2')(x)
+        x = Model(inputs, x)
 
-    model = Model(inputs=img_input, outputs=x)
-    return model
-
-
-def relu6(x):
-    return K.relu(x, max_value=6)
+    return x, fine_grained_layers
 
 
 def _conv_block(inputs, filters, alpha, kernel=(3, 3), strides=(1, 1), name='conv1'):
@@ -92,11 +83,22 @@ class DepthwiseConv2D(Conv2D):
 
     Reference: https://github.com/fchollet/keras/blob/master/keras/applications/mobilenet.py
     """
-    def __init__(self, kernel_size, strides=(1, 1), padding='valid', depth_multiplier=1,
-                 data_format=None, activation=None, use_bias=True,
-                 depthwise_initializer='glorot_uniform', bias_initializer='zeros',
-                 depthwise_regularizer=None, bias_regularizer=None, activity_regularizer=None, depthwise_constraint=None,
+    def __init__(self,
+                 kernel_size,
+                 strides=(1, 1),
+                 padding='valid',
+                 depth_multiplier=1,
+                 data_format=None,
+                 activation=None,
+                 use_bias=True,
+                 depthwise_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 depthwise_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 depthwise_constraint=None,
                  bias_constraint=None, **kwargs):
+
         super(DepthwiseConv2D, self).__init__(
             filters=None,
             kernel_size=kernel_size,

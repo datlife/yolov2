@@ -20,8 +20,8 @@ import numpy as np
 import threading
 
 from utils.box import Box, convert_bbox
-from utils.preprocess_img import preprocess_img
 from utils.augment_img import augment_img
+
 from cfg import *
 from softmaxtree.Tree import SoftMaxTree
 # Get list of classes

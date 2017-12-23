@@ -30,5 +30,6 @@ def split_data(dataset, training='training_data.csv', testing='testing_data.csv'
     print(len(x_test))
     return training, testing
 
+
 if __name__ == "__main__":
     training, testing = split_data('../scripts/training_cutai.txt')

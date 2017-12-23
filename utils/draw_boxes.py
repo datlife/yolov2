@@ -2,58 +2,68 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-def draw(img, boxes):
+def draw(img, bboxes, classes, scores):
     """
-    Drawing Bounding Box on Image
-    :param img:   
-    :param boxes: 
-    :return: 
+          Drawing Bounding Box on Image
+
+    :param img:
+    :param bboxes:
+    :param classes:
+    :param scores:
+    :param fps:
+    :param detection_fps:
+    :return:
     """
-    image = Image.fromarray(np.floor(img).astype('uint8'))
-    thickness = (image.size[0] + image.size[1]) // 600
-    for box in boxes:
-        p1 = (box.x1, box.y1)
-        p2 = (box.x2, box.y2)
-        label = '{} {:.2f}%'.format(box.cls, box.score * 100)
-        draw = ImageDraw.Draw(image)
-        # font = ImageFont.truetype(font='./FiraMono-Medium.otf', encoding='ADOB')
+
+    if len(bboxes) == 0:
+        return img
+
+    height, width, _ = img.shape
+    stretch = width / float(height)
+    image = Image.fromarray(img)
+    font = ImageFont.truetype(
+        font='./dataset/FiraMono-Medium.otf',
+        size=np.floor(3e-2 * image.size[1] + 0.2).astype('int32'))
+
+    thickness = (image.size[0] + image.size[1]) // 300
+    draw = ImageDraw.Draw(image)
+
+    for box, category, score in zip(bboxes, classes, scores):
+        box = box * np.array([width * (1 / stretch), height * stretch, width * (1 / stretch), height * stretch])
+        y1, x1, y2, x2 = [int(i) for i in box]
+        p1 = (x1, y1)
+        p2 = (x2, y2)
+        label = '{} {:.2f} %   '.format(category, score * 100)
         label_size = draw.textsize(label)
         text_origin = np.array([p1[0], p1[1] + 1])
-        color = np.random.randint(0, 255, [3])
-        color = np.array([0, 255, 0])
 
+        color = np.array([0, 255, 0])
         for i in range(thickness):
             draw.rectangle([p1[0] + i, p1[1] + i, p2[0] - i, p2[1] - i], outline=tuple(color))
 
         draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=tuple(color))
-        draw.text(tuple(text_origin), label, fill=(0, 0, 0), label_size=2)
+        draw.text(tuple(text_origin), label, fill=(0, 0, 0), label_size=1, font=font)
 
-        del draw
-    return image
-
-
-class DrawingBox(object):
-    def __init__(self, x1, y1, x2, y2, label, score):
-        self.x1 = int(x1)
-        self.x2 = int(x2)
-        self.y1 = int(y1)
-        self.y2 = int(y2)
-        self.cls = str(label)
-        self.score = float(score)
+    del draw
+    return np.array(image)
 
 
-# Test
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    import cv2
+def draw_fps(img, fps, detection_fps):
+    height, width, _ = img.shape
+    image = Image.fromarray(img)
+    font = ImageFont.truetype(font='./assets/FiraMono-Medium.otf',
+                              size=np.floor(3e-2 * image.size[1] + 0.4).astype('int32'))
+    draw = ImageDraw.Draw(image)
+    draw.text((10, height - 20),
+              "Camera FPS: {:.2f} fps".format(fps),
+              fill=(0, 255, 0),
+              label_size=3,
+              font=font)
 
-    img = cv2.cvtColor(cv2.imread('../test_images/person.jpg'), cv2.COLOR_BGR2RGB)
-    dog = DrawingBox(70, 258, 209, 356, 'Dog', 0.79)
-    person = DrawingBox(190, 98, 271, 379, 'Person', 0.81)
-    horse = DrawingBox(399, 128, 605, 352, 'Horse', 0.89)
-    boxes = [dog, person, horse]
+    draw.text((width - 200, height - 20),
+              "Detection FPS: {:.2f} fps".format(detection_fps),
+              fill=(0, 255, 0),
+              label_size=3,
+              font=font)
 
-    result = draw(img, boxes)
-    plt.figure(figsize=(15, 15))
-    plt.imshow(result)
-    plt.show()
+    return np.array(image)
