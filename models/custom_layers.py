@@ -109,8 +109,8 @@ class PostProcessor(Layer):
         box_maxes = box_xy + (box_wh / 2.)
 
         # Y1, X1, Y2, X2
-        boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1],     # Y1 X1
-                               box_maxes[..., 1:2], box_maxes[..., 0:1]])  # Y2 X2
+        boxes = K.concatenate([box_mins[..., 1:2],  box_mins[..., 0:1],   # Y1 X1
+                               box_maxes[..., 1:2], box_maxes[..., 0:1]]) # Y2 X2
 
         box_scores  = box_confidence * box_class_probs
         box_classes = K.argmax(box_scores, -1)
