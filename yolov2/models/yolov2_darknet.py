@@ -1,13 +1,12 @@
 """
 Construct Original YOLOv2 model
 """
+from .feature_extractors import darknet19
+from .preprocessor import yolov2_preprocess_func
 
-from models.net_builder import YOLOv2MetaArch
-from models.custom_layers import ImageResizer
-
-from models.feature_extractors import darknet19
-from models.detectors.yolov2 import yolov2_detector
-from models.preprocessor import yolov2_preprocess_func
+from .net_builder import YOLOv2MetaArch
+from .custom_layers import ImageResizer
+from .detectors.yolov2 import yolov2_detector
 
 
 def yolov2_darknet(inputs,

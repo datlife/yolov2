@@ -12,18 +12,17 @@ It will generates two things for every batch:
     * Each ground truth contain : xc, yc, w, h, to, one_hot_labels
 
 """
-import os
 import cv2
 import random
 import pandas as pd
 import numpy as np
 import threading
 
-from utils.box import Box, convert_bbox
-from utils.augment_img import augment_img
+from yolov2.utils.box import Box, convert_bbox
+from yolov2.utils import augment_img
 
 from cfg import *
-from softmaxtree.Tree import SoftMaxTree
+from yolov2.softmaxtree import SoftMaxTree
 # Get list of classes
 with open(CATEGORIES, 'r') as fl:
     CLASSES = np.array(fl.read().splitlines())

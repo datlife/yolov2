@@ -16,7 +16,7 @@ import keras.backend as K
 
 from keras.layers import Conv2D
 from keras.layers import Lambda
-from .custom_layers import Preprocessor, PostProcessor, Reroute
+from .custom_layers import Preprocessor, PostProcessor
 
 
 class YOLOv2MetaArch(object):

@@ -1,6 +1,6 @@
 import csv
 from itertools import islice
-from utils.box import Box, convert_bbox
+from yolov2.utils.box import convert_bbox
 
 
 def parse_inputs(filename, label_dict):

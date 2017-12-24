@@ -23,9 +23,9 @@ from models.post_process import post_process
 from models.net_builder import YOLOv2MetaArch
 from models.FeatureExtractor import FeatureExtractor
 
-from utils.draw_boxes import DrawingBox
-from utils.preprocess_img import preprocess_img
-from utils.visualize import draw_bboxes
+from yolov2.utils import DrawingBox
+from yolov2.utils import preprocess_img
+from yolov2.utils import draw_bboxes
 
 from argparse import ArgumentParser
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")

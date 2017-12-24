@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import copy
-from utils.box import Box
+from yolov2.utils.box import Box
 
 
 def augment_img(img, objects):
