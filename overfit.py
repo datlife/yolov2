@@ -8,7 +8,7 @@ import numpy as np
 from argparse import ArgumentParser
 
 from cfg import *
-from models.YOLOv2 import YOLOv2
+from models.net_builder import YOLOv2MetaArch
 from models.FeatureExtractor import FeatureExtractor
 
 from utils.parser import parse_inputs
@@ -60,11 +60,11 @@ def _main_():
     # #################
     with tf.variable_scope('yolov2', regularizer=None):
         darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
-        yolo = YOLOv2(num_classes=N_CLASSES,
-                      anchors=np.array(ANCHORS),
-                      is_training=False,
-                      feature_extractor=darknet,
-                      detector=FEATURE_EXTRACTOR)
+        yolo = YOLOv2MetaArch(num_classes=N_CLASSES,
+                              anchors=np.array(ANCHORS),
+                              is_training=False,
+                              feature_extractor=darknet,
+                              detector=FEATURE_EXTRACTOR)
 
         for l in yolo.feature_extractor.model.layers:
             l.trainable = False

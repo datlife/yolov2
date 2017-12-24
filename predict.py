@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 from utils.draw_boxes import draw
 
-import tensorflow as tf
 import keras.backend as K
 
 from keras.layers import Input
@@ -28,7 +27,7 @@ def _main_(parser):
     scores_threshold = args.threshold
     anchors, label_dict = config_prediction()
 
-    with tf.Session() as sess:
+    with K.get_session() as sess:
 
         inputs                 = Input(shape=(None, None, 3), name='image_input')
         # ###################
@@ -84,21 +83,22 @@ def config_prediction():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Over-fit model to validate loss function")
+    parser = argparse.ArgumentParser(description="Detect object in an image",
+                                     formatter_class=argparse.MetavarTypeHelpFormatter)
 
-    parser.add_argument('-p', '--path',
-                        help="Path to image file", type=str, default='./assets/example.jpg')
+    parser.add_argument('--path', type=str, default='./assets/example.jpg',
+                        help="Path to image file")
 
-    parser.add_argument('-w', '--weights',
-                        help="Path to pre-trained weight files", type=str, default='./assets/coco_yolov2.weights')
+    parser.add_argument('--weights', type=str, default='./assets/coco_yolov2.weights',
+                        help="Path to pre-trained weight file")
 
-    parser.add_argument('-o', '--output-path',
-                        help="Save image to output directory", type=str, default=None)
+    parser.add_argument('--output-dir', type=str, default=None,
+                        help="Output Directory")
 
-    parser.add_argument('-i', '--iou',
-                        help="IoU value for Non-max suppression", type=float, default=0.5)
+    parser.add_argument('--iou', type=float, default=0.5 ,
+                        help="Intersection over Union (IoU) value")
 
-    parser.add_argument('-t', '--threshold',
-                        help="Threshold value to display box", type=float, default=0.6)
+    parser.add_argument('--threshold', type=float, default=0.6,
+                        help="Score Threshold value (minimum accuracy)")
     _main_(parser)
     print("Done!")
