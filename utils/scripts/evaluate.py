@@ -20,7 +20,7 @@ import tensorflow as tf
 
 from cfg import *
 from models.post_process import post_process
-from models.YOLOv2 import YOLOv2
+from models.net_builder import YOLOv2MetaArch
 from models.FeatureExtractor import FeatureExtractor
 
 from utils.draw_boxes import DrawingBox
@@ -77,11 +77,11 @@ def _main_():
 
     with tf.Session() as sess:
         darknet = FeatureExtractor(is_training=True, img_size=None, model=FEATURE_EXTRACTOR)
-        yolo = YOLOv2(num_classes=N_CLASSES,
-                      anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
-                      is_training=False,
-                      feature_extractor=darknet,
-                      detector=FEATURE_EXTRACTOR)
+        yolo = YOLOv2MetaArch(num_classes=N_CLASSES,
+                              anchors=np.array(ANCHORS) * (IMG_INPUT_SIZE / 608),
+                              is_training=False,
+                              feature_extractor=darknet,
+                              detector=FEATURE_EXTRACTOR)
 
         yolov2 = yolo.model
         yolov2.summary()

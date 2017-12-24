@@ -21,7 +21,7 @@ python create_custom_dataset.py
 
 Return
 ------
-  yolov2
+  yolov2_darknet
   |- dataset
      | - my_new_data_set
          | --  categories.txt
