@@ -10,11 +10,8 @@ N_ANCHORS = 5
 CATEGORIES = "./dataset/coco/categories.txt"
 ANCHORS    = "./dataset/coco/anchors.txt"
 
-
-# Type of Feature Extractor.
-FEATURE_EXTRACTOR     = 'yolov2'
-
 # Image resolution being reduced 2^5 = 32 times
+# This is dependent on the feature extractor (how many times does it apply max-pooling)
 SHRINK_FACTOR  = 32
 
 # OPTIONAL -  HIERARCHICAL TREE - Disabled if training on your custom data (or look at lisa.tree on how to setup)

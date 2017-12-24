@@ -19,7 +19,7 @@ import keras.backend as K
 from keras.layers import Input
 from keras.models import Model
 from models.yolov2_darknet import yolov2_darknet
-from cfg import *
+from config import *
 
 # TF Libraries to export model into .pb file
 from tensorflow.python.client import session

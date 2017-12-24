@@ -7,13 +7,13 @@ import tensorflow as tf
 import numpy as np
 from argparse import ArgumentParser
 
-from cfg import *
+from config import *
 from models.net_builder import YOLOv2MetaArch
 from models.FeatureExtractor import FeatureExtractor
 
-from utils.parser import parse_inputs
+from yolov2.utils import parse_inputs
 from models.loss import custom_loss
-from utils.data_generator import flow_from_list
+from yolov2.utils import flow_from_list
 
 parser = ArgumentParser(description="Over-fit one sample to validate YOLOv2 Loss Function")
 

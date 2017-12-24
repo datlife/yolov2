@@ -6,7 +6,7 @@ import sys
 import re
 from copy import deepcopy
 from collections import namedtuple
-from cfg import CATEGORIES
+from config import CATEGORIES
 import numpy as np
 
 MatchStats = namedtuple("MatchStats", ["numAnnotations", "tpCount", "fpCount", "precision", "recall", "widthsFound"])

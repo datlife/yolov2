@@ -21,7 +21,7 @@ import threading
 from yolov2.utils.box import Box, convert_bbox
 from yolov2.utils import augment_img
 
-from cfg import *
+from config import *
 from yolov2.softmaxtree import SoftMaxTree
 # Get list of classes
 with open(CATEGORIES, 'r') as fl:

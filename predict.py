@@ -3,15 +3,15 @@ import os
 import re
 import cv2
 import numpy as np
-from utils.draw_boxes import draw
+from yolov2.utils.draw_boxes import draw
 
 import keras.backend as K
 
 from keras.layers import Input
 from keras.models import Model
+from yolov2.models import yolov2_darknet
 
-from models.yolov2_darknet import yolov2_darknet
-from cfg import ANCHORS, IMG_INPUT_SIZE, N_CLASSES, CATEGORIES
+from config import ANCHORS, IMG_INPUT_SIZE, N_CLASSES, CATEGORIES
 
 
 def _main_(parser):
@@ -40,6 +40,7 @@ def _main_(parser):
                                  num_classes = N_CLASSES,
                                  iou         = iou,
                                  scores_threshold = scores_threshold)
+
 
         model = Model(inputs=inputs, outputs=outputs)
         model.load_weights(weight_file)

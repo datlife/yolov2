@@ -33,8 +33,8 @@ import os
 import csv
 import numpy as np
 from PIL import Image
-from utils.box import box_iou, Box
-from cfg import IMG_INPUT_SIZE, SHRINK_FACTOR
+from yolov2.utils.box import box_iou, Box
+from config import IMG_INPUT_SIZE, SHRINK_FACTOR
 from sklearn.model_selection import train_test_split
 
 from argparse import ArgumentParser

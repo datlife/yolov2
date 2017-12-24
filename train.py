@@ -29,7 +29,6 @@ python train.py \
 """
 import os
 import re
-import random
 import numpy as np
 from argparse import ArgumentParser
 
@@ -38,9 +37,9 @@ import keras.backend as K
 from keras.layers import Input
 from keras.models import Model
 
-from cfg import *
+from config import *
 from models.yolov2_darknet import yolov2_darknet
-from utils.parser import parse_inputs
+from yolov2.utils import parse_inputs
 
 parser = ArgumentParser(description="Train YOLOv2")
 parser.add_argument('--train-path',

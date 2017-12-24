@@ -18,7 +18,7 @@ import keras.backend as K
 import numpy as np
 import tensorflow as tf
 
-from cfg import *
+from config import *
 from models.post_process import post_process
 from models.net_builder import YOLOv2MetaArch
 from models.FeatureExtractor import FeatureExtractor
