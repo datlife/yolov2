@@ -23,7 +23,7 @@ def draw(img, bboxes, classes, scores):
     image = Image.fromarray(img)
     font = ImageFont.truetype(
         font='./dataset/FiraMono-Medium.otf',
-        size=np.floor(3e-2 * image.size[1] + 0.2).astype('int32'))
+        size=np.floor(2e-4 * image.size[1]).astype('int32'))
 
     thickness = (image.size[0] + image.size[1]) // 300
     draw = ImageDraw.Draw(image)
