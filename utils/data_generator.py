@@ -92,8 +92,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False, use_tr
                 if augmentation:
                     img, objects = augment_img(img, objects)
 
-                processed_img = preprocess_img(img)
-                aug_img = cv2.resize(processed_img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE))
+                aug_img = cv2.resize(img, (IMG_INPUT_SIZE, IMG_INPUT_SIZE))
 
                 x_batch[i] = aug_img
                 for obj in objects:
@@ -108,7 +107,7 @@ def flow_from_list(training_instances, batch_size=32, augmentation=False, use_tr
 
                     # convert to relative value
                     xc, yc, w, h = bbox.to_relative_size((float(width), float(height)))
-                    object_mask = np.concatenate([[xc, yc, w, h], [1.0], one_hot])  # A cell in grid map
+                    object_mask  = np.concatenate([[xc, yc, w, h], [1.0], one_hot])  # A cell in grid map
                     center_x = xc * grid_w
                     center_y = yc * grid_h
                     r = int(np.floor(center_x))
