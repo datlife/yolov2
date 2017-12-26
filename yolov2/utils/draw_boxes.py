@@ -10,8 +10,6 @@ def draw(img, bboxes, classes, scores):
     :param bboxes:
     :param classes:
     :param scores:
-    :param fps:
-    :param detection_fps:
     :return:
     """
 
@@ -51,7 +49,7 @@ def draw(img, bboxes, classes, scores):
 def draw_fps(img, fps, detection_fps):
     height, width, _ = img.shape
     image = Image.fromarray(img)
-    font = ImageFont.truetype(font='./assets/FiraMono-Medium.otf',
+    font = ImageFont.truetype(font='./dataset/FiraMono-Medium.otf',
                               size=np.floor(3e-2 * image.size[1] + 0.4).astype('int32'))
     draw = ImageDraw.Draw(image)
     draw.text((10, height - 20),
