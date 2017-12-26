@@ -134,13 +134,6 @@ def _main_():
         # ###################
         # COMPILE AND TRAIN #
         # ###################
-        print("Starting training process\n")
-        print("Hyper-parameters: LR {} | Batch {} | Optimizers {} | L2 {}".format(learning_rate,
-                                                                                  batch_size,
-                                                                                  "Adam", "5e-4"))
-        print("Number of classes: %s" % N_CLASSES)
-        print("Number of anchors: %s" % len(anchors))
-
         model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
                       loss     = detection_model.loss_func)
 

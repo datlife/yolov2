@@ -12,14 +12,14 @@ In this example, we export YOLOv2 with darknet-19 as feature extractor
 from __future__ import print_function
 
 import os
-import re
+import argparse
+
 import tensorflow as tf
 import keras.backend as K
 
-from keras.layers import Input
-from keras.models import Model
-from models.yolov2_darknet import yolov2_darknet
-from config import *
+import config as cfg
+from yolov2.models import yolov2_darknet
+from yolov2.utils import parse_config, visualize_graph_in_tfboard
 
 # TF Libraries to export model into .pb file
 from tensorflow.python.client import session
@@ -28,7 +28,6 @@ from tensorflow.python.saved_model import signature_constants
 from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.tools.graph_transforms import TransformGraph
 
-import argparse
 
 parser = argparse.ArgumentParser("Export Keras Model to TensorFlow Serving")
 parser.add_argument('--output', type=str, default='/tmp/yolov2',
@@ -51,60 +50,53 @@ def _main_():
     # Parse Config  #
     # ###############
     args = parser.parse_args()
-    iou               = args.iou
-    scores_threshold  = args.threshold
-    weight_file       = args.weight_file
+    anchors, label_dict = parse_config(cfg)
 
-    export_dir        = args.output
-    model_version     = args.version
-
-    if not os.path.isfile(weight_file):
+    if not os.path.isfile(args.weight_file):
         raise IOError("Weight file is invalid")
 
-    anchors, class_names = config_prediction()
-    # Interference Pipeline for object detection Model
+    # ######################
+    #  Interference Pipeline
+    # ######################
     with K.get_session() as sess:
 
-        inputs = Input(shape=(None, None, 3), name='image_input')
-        # #########################
-        # Reconstruct Trained Model
-        # #########################
-        outputs = yolov2_darknet(is_training=False,
-                                 inputs=inputs,
-                                 img_size=IMG_INPUT_SIZE,
-                                 anchors=anchors,
-                                 num_classes=N_CLASSES,
-                                 iou=iou,
-                                 scores_threshold=scores_threshold)
+        # ###################
+        # Define Keras Model
+        # ###################
+        model = yolov2_darknet(is_training  = False,
+                               img_size     = cfg.IMG_INPUT_SIZE,
+                               anchors      = anchors,
+                               num_classes  = cfg.N_CLASSES,
+                               iou          = args.iou,
+                               scores_threshold = args.threshold)
 
-        model = Model(inputs=inputs, outputs=outputs)
-        model.load_weights(weight_file)
+        model.load_weights(args.weight_file)
         model.summary()
 
         # ########################
         # Configure output Tensors
         # ########################
         outputs = dict()
-        outputs['detection_boxes']   = tf.identity(model.output[0], name='detection_boxes')
+        outputs['detection_boxes']   = tf.identity(model.outputs[0], name='detection_boxes')
         outputs['detection_scores']  = tf.identity(model.output[1], name='detection_scores')
-        outputs['detection_classes'] = tf.identity(model.output[2], name='detection_classes')
+        outputs['detection_classes'] = tf.identity(model.outputs[2], name='detection_classes')
 
         for output_key in outputs:
             tf.add_to_collection('inference_op', outputs[output_key])
 
         output_node_names = ','.join(outputs.keys())
 
-        # ###############################
-        # Freeze the model into pb format
-        # ###############################
+        # ################
+        # Freeze the model
+        # ################
         frozen_graph_def = graph_util.convert_variables_to_constants(
                                      sess,
                                      sess.graph.as_graph_def(),
                                      output_node_names.split(','))
 
-        # ####################################
-        # Quantize and Optimize Trained Model
-        # ####################################
+        # #####################
+        # Quantize Frozen Model
+        # #####################
         transforms = ["add_default_attributes",
                       "quantize_weights", "round_weights",
                       "fold_batch_norms", "fold_old_batch_norms"]
@@ -114,14 +106,15 @@ def _main_():
                                          outputs=output_node_names.split(','),
                                          transforms=transforms)
 
-        graph_io.write_graph(quantized_graph, './', 'frozen_graph.pb', as_text=False)
+        # graph_io.write_graph(quantized_graph, './', 'frozen_graph.pb', as_text=False)
 
     # #####################
     # Export to TF Serving#
     # #####################
-    #   Reference: https://github.com/tensorflow/models/tree/master/research/object_detection
+    export_path = os.path.join(args.output,
+                               args.version)
 
-    export_path = os.path.join(export_dir, model_version)
+    #  Reference: https://github.com/tensorflow/models/tree/master/research/object_detection
     with tf.Graph().as_default():
         tf.import_graph_def(quantized_graph, name='')
 
@@ -132,13 +125,11 @@ def _main_():
         rewrite_options.optimizers.append('layout')
         graph_options = tf.GraphOptions(rewrite_options=rewrite_options, infer_shapes=True)
 
+        # Build model for TF Serving
         config = tf.ConfigProto(graph_options=graph_options)
         with session.Session(config=config) as sess:
-
             builder = tf.saved_model.builder.SavedModelBuilder(export_path)
-
-            tensor_info_inputs = {
-                'inputs': tf.saved_model.utils.build_tensor_info(inputs)}
+            tensor_info_inputs = {'inputs': tf.saved_model.utils.build_tensor_info(model.inputs[0])}
             tensor_info_outputs = {}
             for k, v in outputs.items():
                 tensor_info_outputs[k] = tf.saved_model.utils.build_tensor_info(v)
@@ -156,22 +147,9 @@ def _main_():
                                        },
             )
             builder.save()
-
-
-def config_prediction():
-    # Config Anchors
-    anchors = []
-    with open(ANCHORS, 'r') as f:
-        data = f.read().splitlines()
-        for line in data:
-            numbers = re.findall('\d+.\d+', line)
-            anchors.append((float(numbers[0]), float(numbers[1])))
-    # Load class names
-    with open(CATEGORIES, mode='r') as txt_file:
-        class_names = [c.strip() for c in txt_file.readlines()]
-    return anchors, class_names
+    visualize_graph_in_tfboard(os.path.join(export_path,'saved_model.pb'), './logs')
+    print("Model is ready for TF Serving.")
 
 
 if __name__ == "__main__":
-
     _main_()
