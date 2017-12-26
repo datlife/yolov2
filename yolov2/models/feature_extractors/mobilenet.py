@@ -14,6 +14,13 @@ from keras import initializers, regularizers, constraints
 from keras.utils import conv_utils
 
 
+def mobilenet_preprocces_func(x):
+    x = x / 255.
+    x -= 0.5
+    x *= 2.
+    return x
+
+
 def relu6(x):
     return K.relu(x, max_value=6)
 
