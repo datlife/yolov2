@@ -16,40 +16,44 @@ import keras.backend as K
 
 from keras.layers import Conv2D
 from keras.layers import Lambda
-from .custom_layers import Preprocessor, PostProcessor
+from .custom_layers import PostProcessor
 
 
 class YOLOv2MetaArch(object):
     def __init__(self,
-                 preprocess_func,
                  feature_extractor,
                  detector,
                  anchors,
                  num_classes):
+        """
+        YOLOv2 meta architecture, it consists of:
+            * Preprocessor      - a custom keras layer that pre-process inputs
+            * Feature Extractor - a FeatureExtractor object
+            * Detector          - a Detector Object
+        :param feature_extractor:
+        :param detector:
+        :param anchors:
+        :param num_classes:
+        """
 
         self.anchors             = anchors
         self.num_classes         = num_classes
-        self.preprocess_func     = preprocess_func
 
         self.feature_extractor   = feature_extractor
         self.detector            = detector
 
     def predict(self, resized_inputs):
 
-        preprocessed_inputs  = Preprocessor(self.preprocess_func,
-                                            name='preprocessor')(resized_inputs)
         # ##################
         # Feature Extractor
         # ##################
-        feature_map, fine_grained_layers = self.feature_extractor(preprocessed_inputs)
+        feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
 
         # ################
         # Object Detector
         # ################
-        outputs = self.detector(feature_map, fine_grained_layers)
-
-        predictions = Conv2D(len(self.anchors) * (self.num_classes + 5),
-                             (1, 1), name='yolov2')(outputs)
+        outputs     = self.detector(feature_map, pass_through_layers)
+        predictions = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1), name='yolov2')(outputs)
 
         return predictions
 
@@ -73,6 +77,14 @@ class YOLOv2MetaArch(object):
         classes = Lambda(lambda x: K.cast(x[..., 5], tf.float32),  name="classes")(outputs)
 
         return boxes, classes, scores
+
+    def compute_loss(self, prediction):
+        """
+        Keras does not support loss function during graph construction.
+
+        A loss function can only be pass during model.compile(loss=loss_func)
+        """
+        raise NotImplemented
 
 # ##############
 # HELPER METHODS

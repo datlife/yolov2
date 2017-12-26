@@ -1,16 +1,16 @@
 """
 Construct Original YOLOv2 model
 """
-from .feature_extractors import darknet19
-from .preprocessor import yolov2_preprocess_func
-
+from keras.layers import Input
+from keras.models import Model
 from .net_builder import YOLOv2MetaArch
+
+from .feature_extractors import darknet19
 from .custom_layers import ImageResizer
 from .detectors.yolov2 import yolov2_detector
 
 
-def yolov2_darknet(inputs,
-                   img_size,
+def yolov2_darknet(img_size,
                    is_training,
                    anchors,
                    num_classes,
@@ -18,7 +18,6 @@ def yolov2_darknet(inputs,
                    scores_threshold):
     """Definition of YOLOv2 using DarkNet19 as feature extractor
 
-    :param inputs:      - a Input keras layer - a placeholder of batch of imageas
     :param img_size:    - a int - default image size that let ImageResizer to know how to resize the image
     :param is_training: - a boolean
     :param anchors:     - a numpy of float array - list of anchors
@@ -28,9 +27,9 @@ def yolov2_darknet(inputs,
 
     :return: the outputs of model
     """
+    inputs = Input(shape=(None, None, 3), name='image_input')
 
-    yolov2 = YOLOv2MetaArch(preprocess_func  = yolov2_preprocess_func,
-                            feature_extractor= darknet19,
+    yolov2 = YOLOv2MetaArch(feature_extractor= darknet19,
                             detector         = yolov2_detector,
                             anchors          = anchors,
                             num_classes      = num_classes)
@@ -39,11 +38,11 @@ def yolov2_darknet(inputs,
     predictions    = yolov2.predict(resized_inputs)
 
     if is_training:
-        return predictions
+        return Model(inputs=inputs, outputs=predictions)
 
     else:
         boxes, classes, scores = yolov2.post_process(predictions,
                                                      iou_threshold  = iou,
                                                      score_threshold= scores_threshold)
-        return boxes, classes, scores
+        return Model(inputs=inputs, outputs=[boxes, classes, scores])
 
