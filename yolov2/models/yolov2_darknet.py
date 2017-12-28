@@ -35,14 +35,14 @@ def yolov2_darknet(img_size,
                             num_classes      = num_classes)
 
     resized_inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
-    predictions    = yolov2.predict(resized_inputs)
+    outputs    = yolov2.predict(resized_inputs)
 
     if is_training:
-        return Model(inputs=inputs, outputs=predictions)
+        return Model(inputs=inputs, outputs=outputs)
 
     else:
-        boxes, classes, scores = yolov2.post_process(predictions,
-                                                     iou_threshold  = iou,
-                                                     score_threshold= scores_threshold)
-        return Model(inputs=inputs, outputs=[boxes, classes, scores])
+        outputs = yolov2.post_process(outputs,
+                                      iou_threshold  = iou,
+                                      score_threshold= scores_threshold)
+        return Model(inputs=inputs, outputs=outputs)
 

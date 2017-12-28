@@ -86,31 +86,19 @@ class PostProcessor(Layer):
     """
     Perform Non-Max Suppression to calculate prediction
     """
-    def __init__(self, score_threshold, iou_threshold, interpret_prediction, anchors, num_classes, **kwargs):
-        self.score_threshold       = score_threshold
-        self.iou_threshold         = iou_threshold
-        self.interpret_prediction = interpret_prediction
-        self.anchors               = anchors
-        self.num_classes           = num_classes
+    def __init__(self, score_threshold, iou_threshold, max_boxes=1000, **kwargs):
+        self.max_boxes         = max_boxes
+        self.iou_threshold     = iou_threshold
+        self.score_threshold   = score_threshold
 
-        self.result = None
         super(PostProcessor, self).__init__(**kwargs)
 
     def build(self, input_shape):
         super(PostProcessor, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-        box_xy, box_wh, box_confidence, box_class_probs = self.interpret_prediction(inputs,
-                                                                                    self.anchors,
-                                                                                    self.num_classes)
 
-        # Calculate corner points of bounding boxes
-        box_mins  = box_xy - (box_wh / 2.)
-        box_maxes = box_xy + (box_wh / 2.)
-
-        # Y1, X1, Y2, X2
-        boxes = K.concatenate([box_mins[..., 1:2],  box_mins[..., 0:1],   # Y1 X1
-                               box_maxes[..., 1:2], box_maxes[..., 0:1]]) # Y2 X2
+        boxes, box_confidence, box_class_probs = inputs
 
         box_scores  = box_confidence * box_class_probs
         box_classes = K.argmax(box_scores, -1)
@@ -122,7 +110,7 @@ class PostProcessor(Layer):
         scores  = tf.boolean_mask(box_class_scores, prediction_mask)
         classes = tf.boolean_mask(box_classes, prediction_mask)
 
-        nms_index = tf.image.non_max_suppression(boxes, scores, 100, self.iou_threshold)
+        nms_index = tf.image.non_max_suppression(boxes, scores, self.max_boxes, self.iou_threshold)
         boxes   = tf.gather(boxes, nms_index)
         scores  = K.expand_dims(tf.gather(scores, nms_index), axis=-1)
         classes = K.expand_dims(tf.gather(classes, nms_index), axis=-1)
@@ -135,8 +123,6 @@ class PostProcessor(Layer):
     def get_config(self):
         config = {'score_threshold': self.score_threshold,
                   'iou_threshold': self.iou_threshold,
-                  'interpret_prediction': self.interpret_prediction,
-                  'anchors': self.anchors,
-                  'num_classes': self.num_classes}
+                  'max_boxes': self.max_boxes}
         base_config = super(PostProcessor, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

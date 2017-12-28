@@ -1,99 +1,150 @@
 import cv2
+import numpy as np
 import time
 import config as cfg
-import tensorflow as tf
-from multiprocessing import Queue, Pool
+
+import multiprocessing as mp
+from threading import Thread
 
 from yolov2.utils import parse_config
 from yolov2.utils import draw, draw_fps
-from yolov2.utils import WebcamVideoStream
-
 from yolov2.tfserving.client import ObjectDetectionClient
 
 # Command line arguments
-tf.app.flags.DEFINE_string('server', 'localhost:9000', 'PredictionService host:port')
-tf.app.flags.DEFINE_string('model', 'ssd', 'tf serving model (yolov2, ssd, fasterrcnn')
-tf.app.flags.DEFINE_string('src', 0, "Source to webcam [default = 0]")
+import argparse
+parser = argparse.ArgumentParser(description="Webcam demo")
 
-FLAGS = tf.app.flags.FLAGS
+parser.add_argument('--server', type=str, default='localhost:9000',
+                    help="PredictionService host:port [default=localhost:9000]")
 
-model = FLAGS.model
-_, label_dict = parse_config(cfg)
+parser.add_argument('--model', type=str, default='yolov2',
+                    help="tf serving model name [default=yolov2]")
 
-detector = ObjectDetectionClient('localhost:9000', model, label_dict)
-
-
-def main(_):
-    video_capture = WebcamVideoStream(FLAGS.src).start()
-
-    input_q = Queue(maxsize=5)
-    output_q = Queue(maxsize=1)
-    pool = Pool(1, worker, (input_q, output_q))
-
-    boxes   = []
-    classes = []
-    scores  = []
-
-    num_frames       = 0
-    detection_fps    = 0
-    detection_frames = 0
-
-    start = time.time()
-    while True:
-        frame = video_capture.read()
-
-        if input_q.full():
-            input_q.get()
-
-        input_q.put(frame)
-
-        if not output_q.empty():
-            boxes, classes, scores = output_q.get()
-            detection_frames += 1
-            detection_fps = detection_frames / (time.time() - start)
-
-        num_frames += 1
-        camera_fps = num_frames / (time.time() - start)
-
-        # frame = draw(frame, boxes, classes, scores)
-        frame = draw_fps(frame, camera_fps, detection_fps)
-
-        cv2.imshow('Video', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    elapsed = (time.time() - start)
-    print('[INFO] elapsed time (total): {:.2f}'.format(elapsed))
-    print('[INFO] approx. FPS: {:.2f}'.format(num_frames / elapsed))
-    print('[INFO] approx. detection FPS: {:.2f}'.format(detection_frames / elapsed))
-    video_capture.stop()
-    cv2.destroyAllWindows()
+parser.add_argument('--video_source', type=int, default=0,
+                    help="Source to webcam [default = 0]")
 
 
-def worker(input_q, output_q):
-    while True:
-        frame = input_q.get()
-        output_q.put(detect_objects_in(frame))
+def main():
+    # ############
+    # Parse Config
+    # ############
+    ARGS = parser.parse_args()
+    _, label_dict = parse_config(cfg)
+
+    # #########
+    # Init Demo
+    # ##########
+    object_detector = ObjectDetectionClient(ARGS.server, ARGS.model, label_dict, verbose=True)
+    video_capture = WebcamVideoStream(ARGS.video_source).start()
+
+    # ##########
+    # Start Demo
+    # ###########
+    viewer = WebCamViewer(video_capture, object_detector)
+    print("Initialized object detection client at {} with model {}".format(ARGS.server, ARGS.model))
+
+    viewer.run()
 
 
-def detect_objects_in(frame):
-    global detector
-    data = detector.predict(frame)
-    boxes, classes, scores = filter_out(threshold=0.8 , data=data)
-    return boxes, classes, scores
+class WebCamViewer(object):
+    def __init__(self, video_capture, detector):
+        self.video    = video_capture
+        self.detector = detector
+
+        self.input_q  = mp.Queue(maxsize=5)
+        self.output_q = mp.Queue(maxsize=1)
+        pool = mp.Pool(processes=mp.cpu_count()-1, initializer=self.worker)
+
+    def run(self):
+        boxes = []
+        classes = []
+        scores = []
+        num_frames = 0
+        detection_fps = 0
+        detection_frames = 0
+
+        start = time.time()
+        while True:
+            frame = self.video.read()
+
+            if self.input_q.full():
+                self.input_q.get()
+
+            self.input_q.put(frame)
+
+            if not self.output_q.empty():
+                detection_frames += 1
+                detection_fps = detection_frames / (time.time() - start)
+
+                boxes, classes, scores = self.output_q.get()
+
+            num_frames += 1
+            camera_fps = num_frames / (time.time() - start)
+            frame = draw_fps(frame, camera_fps, detection_fps)
+            frame = draw(frame, boxes, classes, scores)
+
+            cv2.imshow('Video', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        elapsed = (time.time() - start)
+        print('[INFO] elapsed time (total): {:.2f}'.format(elapsed))
+        print('[INFO] approx. FPS: {:.2f}'.format(num_frames / elapsed))
+        print('[INFO] approx. detection FPS: {:.2f}'.format(detection_frames / elapsed))
+        self.video.stop()
+        cv2.destroyAllWindows()
+
+    def worker(self):
+        while True:
+            frame = self.input_q.get()
+            self.output_q.put(self.detect_objects_in(frame))
+
+    def detect_objects_in(self, frame, threshold=0.7):
+        h, w, _ = frame.shape
+
+        boxes, classes, scores = self.detector.predict(frame)
+
+        # Filter out results that is not reach a threshold
+        filtered_result = [(b, c, s/100.) for b, c, s in zip(boxes, classes, scores) if s/100. > threshold]
+        boxes, classes, scores = zip(*filtered_result)
+        boxes = [box * np.array([h, w, h, w]) for box in boxes]
+        return boxes, classes, scores
 
 
-def filter_out(threshold, data):
-    boxes, classes, scores = data
-    new_boxes = []
-    new_classes = []
-    new_scores = []
-    for b, c, s in zip(boxes, classes, scores):
-        if s > threshold:
-            new_boxes.append(b)
-            new_classes.append(c)
-            new_scores.append(s)
-    return new_boxes, new_classes, new_scores
+class WebcamVideoStream(object):
+    def __init__(self, src):
+        # initialize the video camera stream
+        self.stream = cv2.VideoCapture(src)
+
+        # set to highest frame rate
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
+        self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))
+        # @TODO: might change to MJPEG later
+
+        (self.grabbed, self.frame) = self.stream.read()
+        self.stopped = False
+
+    def start(self):
+        # start the thread to read frames from the video stream
+        Thread(target=self.update, args=()).start()
+        return self
+
+    def update(self):
+        # keep looping infinitely until the thread is stopped
+        while True:
+            if self.stopped:
+                return
+            (self.grabbed, self.frame) = self.stream.read()
+
+    def read(self):
+        # return the frame most recently read
+        return self.frame
+
+    def stop(self):
+        # indicate that the thread should be stopped
+        self.stopped = True
+
 
 if __name__ == "__main__":
-    tf.app.run()
+    main()

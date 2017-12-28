@@ -1,12 +1,11 @@
 from __future__ import print_function
 from __future__ import absolute_import
-import cv2
 import time
 
 import numpy as np
 import tensorflow as tf
 
-# TensorFlow serving stuff to send messages
+# TensorFlow serving python API to send messages to server
 from grpc.beta import implementations
 from tensorflow_serving.apis import predict_pb2
 from tensorflow_serving.apis import prediction_service_pb2
@@ -27,7 +26,6 @@ class ObjectDetectionClient(object):
         request = predict_pb2.PredictRequest()
 
         start = time.time()
-        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = np.expand_dims(image, axis=0)
 
         request.inputs['inputs'].CopyFrom(tf.make_tensor_proto(image,
@@ -47,10 +45,9 @@ class ObjectDetectionClient(object):
         scores  = result.outputs['detection_scores'].float_val[:num_detections]
         boxes   = result.outputs['detection_boxes'].float_val[:num_detections * 4]
         classes = [self.label_dict[int(idx)] for idx in classes]
-
         boxes   = [boxes[i:i + 4] for i in range(0, len(boxes), 4)]
-
         if self.verbose:
+            print("Number of detections: %s" % len(classes))
             print("Server Prediction in {:.3f} sec || Total {:.3} sec".format(time.time() - pred, time.time() - start))
 
         return boxes, classes, scores
@@ -58,6 +55,6 @@ class ObjectDetectionClient(object):
 
 if __name__ == '__main__':
     import timeit
-    setup = "from __main__ import ObjectDetectionServer, cv2"
-    command = "ObjectDetectionServer('localhost:9000','ssd', verbose=True).predict(cv2.imread('./assets/example.jpg'))"
+    setup = "from __main__ import ObjectDetectionClient, cv2"
+    command = "ObjectDetectionClient('localhost:9000','yolov2', parse_config[ verbose=True).predict(cv2.imread('./test_imgs/person.jpg'))"
     print(timeit.timeit(command, setup=setup))

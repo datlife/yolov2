@@ -7,6 +7,7 @@ lisa.tree
 """
 import numpy as np
 
+
 class Node(object):
 
     def __init__(self, id, node_name, parent, height=0):

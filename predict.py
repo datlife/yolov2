@@ -9,13 +9,12 @@ from yolov2.utils import draw, parse_config
 
 
 def _main_():
-    parser = argparse.ArgumentParser(description="Detect object in an image",
-                                     formatter_class=argparse.MetavarTypeHelpFormatter)
+    parser = argparse.ArgumentParser(description="Detect object in an image")
 
-    parser.add_argument('--path', type=str, default='./assets/example.jpg',
+    parser.add_argument('--path', type=str, default='./test/test_imgs/person.jpg',
                         help="Path to image file")
 
-    parser.add_argument('--weights', type=str, default='./assets/coco_yolov2.weights',
+    parser.add_argument('--weights', type=str, default='yolo-coco.weights',
                         help="Path to pre-trained weight file")
 
     parser.add_argument('--output_dir', type=str, default=None,
@@ -49,9 +48,11 @@ def _main_():
     # #####################
     # Make one prediction #
     # #####################
-    image = np.expand_dims(cv2.imread(args.path), axis=0)
+    image = cv2.imread(args.path)
 
-    pred_bboxes, pred_classes, pred_scores = model.predict_on_batch(image)
+    pred_bboxes, pred_classes, pred_scores = model.predict_on_batch(np.expand_dims(image, axis=0))
+
+    # Convert idx to label
     pred_classes = [label_dict[idx] for idx in pred_classes]
 
     # #################
@@ -59,6 +60,12 @@ def _main_():
     # #################
     h, w, _ = image.shape
     if args.output_dir is not None:
+        # Scale relative coordinates into actual coordinates
+        pred_bboxes  = [box * np.array([h, w, h, w]) for box in pred_bboxes]
+        print("pred_bboxes = {}".format(pred_bboxes))
+        print("pred_classes = {}".format(pred_classes))
+        print("pred_scores = {}".format(pred_scores))
+
         result = draw(image, pred_bboxes, pred_classes, pred_scores)
         cv2.imwrite(os.path.join(args.output_dir, args.path.split('/')[-1].split('.')[0] + '_result.jpg'), result)
 

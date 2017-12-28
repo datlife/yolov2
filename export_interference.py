@@ -30,17 +30,21 @@ from tensorflow.tools.graph_transforms import TransformGraph
 
 
 parser = argparse.ArgumentParser("Export Keras Model to TensorFlow Serving")
-parser.add_argument('--output', type=str, default='/tmp/yolov2',
-                    help="Export path")
-parser.add_argument('--version', type=str, default='1',
-                    help="Model Version", )
-parser.add_argument('--weight_file', type=str, default=None,
-                    help="Path to pre-trained weight files")
-parser.add_argument('--iou', type=float, default=0.5,
-                    help="IoU value for Non-max suppression")
-parser.add_argument('--threshold', type=float, default=0.0,
-                    help="Threshold value to display box")
 
+parser.add_argument('--output_dir', type=str, default='/tmp/yolov2',
+                    help="Export path [default=/tmp/yolov2/")
+
+parser.add_argument('--version', type=str, default='1',
+                    help="Model Version [default=1]", )
+
+parser.add_argument('--weight_file', type=str, default=None,
+                    help="Path to pre-trained weight files [default=None]")
+
+parser.add_argument('--iou', type=float, default=0.5,
+                    help="IoU value for Non-max suppression [default = 0.5]")
+
+parser.add_argument('--threshold', type=float, default=0.6,
+                    help="Threshold value to display box [default=0.0]")
 
 K.set_learning_phase(0)
 
@@ -51,6 +55,8 @@ def _main_():
     # ###############
     args = parser.parse_args()
     anchors, label_dict = parse_config(cfg)
+
+    export_path = os.path.join(args.output_dir, args.version)
 
     if not os.path.isfile(args.weight_file):
         raise IOError("Weight file is invalid")
@@ -70,9 +76,12 @@ def _main_():
                                iou          = args.iou,
                                scores_threshold = args.threshold)
 
+        # Visualize graph in tensor-board
+        summary = tf.summary.FileWriter(os.path.join(args.output_dir, 'graph_def'))
+        summary.add_graph(sess.graph)
+
         model.load_weights(args.weight_file)
         model.summary()
-
         # ########################
         # Configure output Tensors
         # ########################
@@ -83,7 +92,6 @@ def _main_():
 
         for output_key in outputs:
             tf.add_to_collection('inference_op', outputs[output_key])
-
         output_node_names = ','.join(outputs.keys())
 
         # ################
@@ -105,15 +113,11 @@ def _main_():
                                          inputs="image_input",
                                          outputs=output_node_names.split(','),
                                          transforms=transforms)
-
         # graph_io.write_graph(quantized_graph, './', 'frozen_graph.pb', as_text=False)
 
     # #####################
     # Export to TF Serving#
     # #####################
-    export_path = os.path.join(args.output,
-                               args.version)
-
     #  Reference: https://github.com/tensorflow/models/tree/master/research/object_detection
     with tf.Graph().as_default():
         tf.import_graph_def(quantized_graph, name='')
@@ -147,8 +151,9 @@ def _main_():
                                        },
             )
             builder.save()
-    visualize_graph_in_tfboard(os.path.join(export_path,'saved_model.pb'), './logs')
     print("Model is ready for TF Serving.")
+    print("Execute `tensorboard --logdir {}` to view graph in TF Board".format(os.path.join(args.output_dir,
+                                                                                            'graph_def')))
 
 
 if __name__ == "__main__":

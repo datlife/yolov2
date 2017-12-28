@@ -2,7 +2,7 @@
 Main configuration file for YOLOv2 detection model
 """
 # Configuration for COCO dataset
-IMG_INPUT_SIZE = 608
+IMG_INPUT_SIZE = 320
 N_CLASSES = 80
 N_ANCHORS = 5
 
@@ -15,4 +15,4 @@ ANCHORS    = "./dataset/coco/anchors.txt"
 SHRINK_FACTOR  = 32
 
 # OPTIONAL -  HIERARCHICAL TREE - Disabled if training on your custom data (or look at lisa.tree on how to setup)
-HIERARCHICAL_TREE_PATH   = "/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree"
+# HIERARCHICAL_TREE_PATH   = "/home/dat/Documents/yolov2/dataset/combined_lisa/lisa.tree"
