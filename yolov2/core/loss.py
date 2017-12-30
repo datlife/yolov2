@@ -10,75 +10,57 @@ def yolov2_loss(anchors, num_classes):
 
     def compute_loss(y_true, y_pred):
 
-        pred_boxes, pred_confidence, pred_classes = interprete_output(y_pred)
-        gt_boxes,   gt_confidence,   gt_classes   = y_true
+        pred_boxes   = y_pred[..., 0:4]
+        pred_conf    = y_pred[..., 4:5]
+        pred_classes = y_pred[..., 5:]
 
-        localization_loss   = compute_localization_loss(gt_boxes, pred_boxes)
-        classification_loss = compute_classification_loss(gt_classes, pred_classes)
+        gt_boxes   = y_true[..., 0:4]
+        gt_conf    = y_true[..., 4:5]
+        gt_classes = y_true[..., 5]
 
-        # IOU score
-        iou_scores = iou(gt_boxes, pred_boxes)
+        # IOU scores shape [..., 5, 1]
+        box_iou = iou(gt_boxes, pred_boxes)
+        box_iou = tf.reduce_max(box_iou, axis=4)
 
-        total_loss = 1.0 * localization_loss + \
-                     1.0 * classification_loss
+        # @TODO: focal loss
+        loc_loss  = compute_localization_loss(gt_boxes, pred_boxes)
+        conf_loss = tf.reduce_sum(tf.square(pred_conf - gt_conf * box_iou))
+        cls_loss  = compute_classification_loss(gt_classes, pred_classes)
+
+        total_loss = loc_loss + conf_loss + cls_loss
         return total_loss
 
     def compute_localization_loss(gt_boxes, pred_boxes):
-        return 0.0
+        xy_loss = tf.square(pred_boxes[..., 0:2] - gt_boxes[..., 0:2])
+        xy_loss = tf.reduce_sum(xy_loss)
+
+        wh_loss = tf.square(tf.sqrt(pred_boxes[..., 0:2]) - tf.sqrt(gt_boxes[..., 0:2]))
+        wh_loss = tf.reduce_sum(wh_loss)
+        return xy_loss + wh_loss
 
     def compute_classification_loss(gt_classes, pred_classes):
-        return 0.0
-
-    def interprete_output(y_pred):
-        shape = tf.shape(y_pred)
-        height, width = shape[1], shape[2]
-        outputs = K.reshape(y_pred, [-1, height, width, len(anchors), num_classes + 5])
-        anchors_tensor = tf.to_float(K.reshape(anchors, [1, 1, 1, len(anchors), 2]))
-
-        # Create offset grid map @TODO: waiting for Tf.repeat() in coming TF version
-        cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
-        cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
-        cy = tf.reshape(cy, [-1, height, width, 1])
-        offset_grid_map = tf.to_float(tf.stack([cx, cy], -1))
-
-        pred_xy          = K.sigmoid(outputs[..., :2]) + offset_grid_map
-        pred_wh          = K.exp(outputs[..., 2:4]) * anchors_tensor
-        pred_confidence  = K.sigmoid(outputs[..., 4:5])
-        pred_class_probs = K.softmax(outputs[..., 5:])
-
-        output_size = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
-
-        # Convert xy & wh coordinates into relative coordinates
-        pred_xy = pred_xy / output_size
-        pred_wh = pred_wh / output_size
-
-        # Calculate corner points of bounding boxes
-        box_mins  = pred_xy - (pred_wh / 2.)
-        box_maxes = pred_xy + (pred_wh / 2.)
-
-        # Y1, X1, Y2, X2
-        pred_boxes = K.concatenate([box_mins[..., 1:2],  box_mins[..., 0:1],    # Y1 X1
-                                    box_maxes[..., 1:2], box_maxes[..., 0:1]])  # Y2 X2
-
-        return pred_boxes, pred_confidence, pred_class_probs
+        cls_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(gt_classes, dtype=tf.int32),
+                                                                  logits=pred_classes)
+        cls_loss = tf.reduce_sum(cls_loss)
+        return cls_loss
 
     return compute_loss
 
 
-def iou(boxeslist1, boxeslist2, scope=None):
+def iou(boxes_list1, boxes_list2, scope=None):
     """
       Args:
-        boxeslist1: Tensor holding N boxes
-        boxeslist2: Tensor holding M boxes
+        boxes_list1: Tensor holding N boxes
+        boxes_list2: Tensor holding M boxes
         scope
 
       Returns:
         a tensor with shape [N, M] representing pairwise iou scores.
       """
     with tf.name_scope(scope, 'IOU'):
-        intersections = intersection(boxeslist1, boxeslist2)
-        areas1 = area(boxeslist1)
-        areas2 = area(boxeslist2)
+        areas1        = area(boxes_list1)
+        areas2        = area(boxes_list2)
+        intersections = intersection(boxes_list1, boxes_list2)
 
         unions = (tf.expand_dims(areas1, 1) +
                   tf.expand_dims(areas2, 0) - intersections)
@@ -99,11 +81,11 @@ def area(boxes, scope=None):
       a tensor with shape [N] representing box areas.
     """
     with tf.name_scope(scope, 'Area'):
-        y_min, x_min, y_max, x_max = tf.split(value=boxes, num_or_size_splits=4, axis=1)
+        y_min, x_min, y_max, x_max = tf.split(value=boxes, num_or_size_splits=4, axis=-1)
         return tf.squeeze((y_max - y_min) * (x_max - x_min), [1])
 
 
-def intersection(boxlist1, boxlist2, scope=None):
+def intersection(boxes_list1, boxes_list2, scope=None):
     """Compute pairwise intersection areas between boxes.
 
     Args:
@@ -115,8 +97,8 @@ def intersection(boxlist1, boxlist2, scope=None):
     a tensor with shape [N, M] representing pairwise intersections
     """
     with tf.name_scope(scope, 'Intersection'):
-        y_min1, x_min1, y_max1, x_max1 = tf.split(value=boxlist1, num_or_size_splits=4, axis=1)
-        y_min2, x_min2, y_max2, x_max2 = tf.split(value=boxlist2, num_or_size_splits=4, axis=1)
+        y_min1, x_min1, y_max1, x_max1 = tf.split(value=boxes_list1, num_or_size_splits=4, axis=-1)
+        y_min2, x_min2, y_max2, x_max2 = tf.split(value=boxes_list2, num_or_size_splits=4, axis=-1)
 
         all_pairs_min_ymax = tf.minimum(y_max1, tf.transpose(y_max2))
         all_pairs_max_ymin = tf.maximum(y_min1, tf.transpose(y_min2))
@@ -195,44 +177,20 @@ def intersection(boxlist1, boxlist2, scope=None):
 # """
 # Determine the masks
 # """
-# ### coordinate mask: simply the position of the ground truth boxes (the predictors)
+# ### coordinate mask: position of the ground truth boxes (the predictors)
 # coord_mask = tf.expand_dims(y_true[..., 4], axis=-1) * self.coord_scale
 #
-# ### confidence mask: penelize predictors + penalize boxes with low IOU
+# ### confidence mask: penalize predictors + penalize boxes with low IOU
 # # penalize the confidence of the boxes, which have IOU with some ground truth box < 0.6
-# true_xy = self.true_boxes[..., 0:2]
-# true_wh = self.true_boxes[..., 2:4]
-#
-# true_wh_half = true_wh / 2.
-# true_mins = true_xy - true_wh_half
-# true_maxes = true_xy + true_wh_half
-#
-# pred_xy = tf.expand_dims(pred_box_xy, 4)
-# pred_wh = tf.expand_dims(pred_box_wh, 4)
-#
-# pred_wh_half = pred_wh / 2.
-# pred_mins = pred_xy - pred_wh_half
-# pred_maxes = pred_xy + pred_wh_half
-#
-# intersect_mins = tf.maximum(pred_mins, true_mins)
-# intersect_maxes = tf.minimum(pred_maxes, true_maxes)
-# intersect_wh = tf.maximum(intersect_maxes - intersect_mins, 0.)
-# intersect_areas = intersect_wh[..., 0] * intersect_wh[..., 1]
-#
-# true_areas = true_wh[..., 0] * true_wh[..., 1]
-# pred_areas = pred_wh[..., 0] * pred_wh[..., 1]
-#
-# union_areas = pred_areas + true_areas - intersect_areas
+
 # iou_scores = tf.truediv(intersect_areas, union_areas)
-#
 # best_ious = tf.reduce_max(iou_scores, axis=4)
-# conf_mask = conf_mask + tf.to_float(best_ious < 0.6) * (1 - y_true[..., 4]) * self.no_object_scale
+
+# conf_mask =  no_obj_scale * (1 - y_true[..., 4]) * tf.to_float(best_ious < 0.6)+
+#              obj_scale    * y_true[..., 4]
 #
-# # penalize the confidence of the boxes, which are reponsible for corresponding ground truth box
-# conf_mask = conf_mask + y_true[..., 4] * self.object_scale
-#
-# ### class mask: simply the position of the ground truth boxes (the predictors)
-# class_mask = y_true[..., 4] * tf.gather(self.class_wt, true_box_class) * self.class_scale
+# ### class mask:
+# class_mask = class_scale * y_true[..., 4] * tf.gather(self.class_wt, true_box_class)
 #
 # """
 # Warm-up training

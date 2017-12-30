@@ -98,24 +98,27 @@ class PostProcessor(Layer):
 
     def call(self, inputs, **kwargs):
 
-        boxes, box_confidence, box_class_probs = inputs
+        boxes           = inputs[..., 0:4]
+        box_confidence  = inputs[..., 4:5]
+        box_class_probs = inputs[..., 5:]
 
-        box_scores  = box_confidence * box_class_probs
-        box_classes = K.argmax(box_scores, -1)
-
+        box_scores       = box_confidence * box_class_probs
+        box_classes      = K.argmax(box_scores, -1)
         box_class_scores = K.max(box_scores, -1)
         prediction_mask  = (box_class_scores >= self.score_threshold)
 
         boxes   = tf.boolean_mask(boxes, prediction_mask)
         scores  = tf.boolean_mask(box_class_scores, prediction_mask)
         classes = tf.boolean_mask(box_classes, prediction_mask)
-
-        nms_index = tf.image.non_max_suppression(boxes, scores, self.max_boxes, self.iou_threshold)
+        nms_index = tf.image.non_max_suppression(boxes,
+                                                 scores,
+                                                 max_output_size=self.max_boxes,
+                                                 iou_threshold=self.iou_threshold)
         boxes   = tf.gather(boxes, nms_index)
         scores  = K.expand_dims(tf.gather(scores, nms_index), axis=-1)
         classes = K.expand_dims(tf.gather(classes, nms_index), axis=-1)
 
-        return K.concatenate([boxes, scores, K.cast(classes, tf.float32)])
+        return K.concatenate([boxes, K.cast(classes, tf.float32), scores])
 
     def compute_output_shape(self, input_shape):
         return [(None, 6)]

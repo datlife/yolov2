@@ -18,8 +18,8 @@ import tensorflow as tf
 import keras.backend as K
 
 import config as cfg
-from yolov2.models import yolov2_darknet
-from yolov2.utils import parse_config, visualize_graph_in_tfboard
+from yolov2.zoo import yolov2_darknet19
+from yolov2.utils.parser import parse_config
 
 # TF Libraries to export model into .pb file
 from tensorflow.python.client import session
@@ -40,13 +40,11 @@ parser.add_argument('--version', type=str, default='1',
 parser.add_argument('--weight_file', type=str, default=None,
                     help="Path to pre-trained weight files [default=None]")
 
-parser.add_argument('--iou', type=float, default=0.5,
+parser.add_argument('--iou', type=float, default=0.6,
                     help="IoU value for Non-max suppression [default = 0.5]")
 
-parser.add_argument('--threshold', type=float, default=0.6,
+parser.add_argument('--threshold', type=float, default=0.0,
                     help="Threshold value to display box [default=0.0]")
-
-K.set_learning_phase(0)
 
 
 def _main_():
@@ -65,60 +63,62 @@ def _main_():
     #  Interference Pipeline
     # ######################
     with K.get_session() as sess:
+        K.set_learning_phase(0)
 
         # ###################
         # Define Keras Model
         # ###################
-        model = yolov2_darknet(is_training  = False,
-                               img_size     = cfg.IMG_INPUT_SIZE,
-                               anchors      = anchors,
-                               num_classes  = cfg.N_CLASSES,
-                               iou          = args.iou,
-                               scores_threshold = args.threshold)
-
-        # Visualize graph in tensor-board
-        summary = tf.summary.FileWriter(os.path.join(args.output_dir, 'graph_def'))
-        summary.add_graph(sess.graph)
+        model = yolov2_darknet19(is_training = False,
+                                 img_size    = cfg.IMG_INPUT_SIZE,
+                                 anchors     = anchors,
+                                 num_classes = cfg.N_CLASSES,
+                                 iou         = args.iou,
+                                 scores_threshold = args.threshold,
+                                 max_boxes   = 100)
 
         model.load_weights(args.weight_file)
         model.summary()
+
         # ########################
         # Configure output Tensors
         # ########################
         outputs = dict()
         outputs['detection_boxes']   = tf.identity(model.outputs[0], name='detection_boxes')
-        outputs['detection_scores']  = tf.identity(model.output[1], name='detection_scores')
+        outputs['detection_scores']  = tf.identity(model.outputs[1], name='detection_scores')
         outputs['detection_classes'] = tf.identity(model.outputs[2], name='detection_classes')
 
         for output_key in outputs:
             tf.add_to_collection('inference_op', outputs[output_key])
+
         output_node_names = ','.join(outputs.keys())
 
         # ################
         # Freeze the model
         # ################
         frozen_graph_def = graph_util.convert_variables_to_constants(
-                                     sess,
-                                     sess.graph.as_graph_def(),
-                                     output_node_names.split(','))
+                                    sess=sess,
+                                    input_graph_def=sess.graph.as_graph_def(),
+                                    output_node_names=output_node_names.split(','),
+                                    variable_names_whitelist=None,
+                                    variable_names_blacklist=None)
 
-        # #####################
-        # Quantize Frozen Model
-        # #####################
-        transforms = ["add_default_attributes",
-                      "quantize_weights", "round_weights",
-                      "fold_batch_norms", "fold_old_batch_norms"]
+    # #####################
+    # Quantize Frozen Model
+    # #####################
+    transforms = ["add_default_attributes",
+                  "quantize_weights", "round_weights",
+                  "fold_batch_norms", "fold_old_batch_norms"]
 
-        quantized_graph = TransformGraph(frozen_graph_def,
-                                         inputs="image_input",
-                                         outputs=output_node_names.split(','),
-                                         transforms=transforms)
-        # graph_io.write_graph(quantized_graph, './', 'frozen_graph.pb', as_text=False)
+    quantized_graph = TransformGraph(frozen_graph_def,
+                                     inputs="image_input",
+                                     outputs=output_node_names.split(','),
+                                     transforms=transforms)
 
     # #####################
     # Export to TF Serving#
     # #####################
-    #  Reference: https://github.com/tensorflow/models/tree/master/research/object_detection
+    # Reference: https://github.com/tensorflow/models/tree/master/research/object_detection
+
     with tf.Graph().as_default():
         tf.import_graph_def(quantized_graph, name='')
 
@@ -131,6 +131,10 @@ def _main_():
 
         # Build model for TF Serving
         config = tf.ConfigProto(graph_options=graph_options)
+
+        # # check for XLA Compilation
+        # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+
         with session.Session(config=config) as sess:
             builder = tf.saved_model.builder.SavedModelBuilder(export_path)
             tensor_info_inputs = {'inputs': tf.saved_model.utils.build_tensor_info(model.inputs[0])}
@@ -151,7 +155,12 @@ def _main_():
                                        },
             )
             builder.save()
-    print("Model is ready for TF Serving.")
+
+            # Visualize graph in tensor-board
+            summary = tf.summary.FileWriter(os.path.join(args.output_dir, 'graph_def'))
+            summary.add_graph(sess.graph)
+
+    print("\n\nModel is ready for TF Serving. (saved at {}/saved_model.pb)".format(export_path))
     print("Execute `tensorboard --logdir {}` to view graph in TF Board".format(os.path.join(args.output_dir,
                                                                                             'graph_def')))
 

@@ -38,7 +38,6 @@ class YOLOv2MetaArch(object):
 
         self.anchors             = anchors
         self.num_classes         = num_classes
-
         self.feature_extractor   = feature_extractor
         self.detector            = detector
 
@@ -51,13 +50,13 @@ class YOLOv2MetaArch(object):
             with tf.name_scope("Detector"):
                 x       = self.detector(feature_map, pass_through_layers)
                 x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
-                                 name='yolov2_outputs')(x)
+                                 name='output_features')(x)
 
-                outputs = Lambda(lambda x: self.interpret_yolov2(x),
-                                 name='decoded_outputs')(x)
-            return outputs
+                predictions = Lambda(lambda x: self.interpret_yolov2(x),
+                                     name='predictions')(x)
+            return predictions
 
-    def post_process(self, outputs, iou_threshold, score_threshold):
+    def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
         """
         Preform non-max suppression to calculate outputs:
         Using during evaluation/interference
@@ -66,15 +65,14 @@ class YOLOv2MetaArch(object):
         Output:
            Bounding Boxes - Classes - Probabilities
         """
-        outputs = PostProcessor(score_threshold,
-                                iou_threshold,
-                                max_boxes=1000,
-                                name="non_max_suppression")(outputs)
+        outputs = PostProcessor(score_threshold= score_threshold,
+                                iou_threshold  = iou_threshold,
+                                max_boxes      = max_boxes,
+                                name="NonMaxSuppression")(predictions)
 
         boxes   = Lambda(lambda x: x[..., :4], name="boxes")(outputs)
         scores  = Lambda(lambda x: x[..., 4],  name="scores")(outputs)
         classes = Lambda(lambda x: K.cast(x[..., 5], tf.float32),  name="classes")(outputs)
-
         return boxes, classes, scores
 
     def interpret_yolov2(self, predictions):
@@ -85,42 +83,44 @@ class YOLOv2MetaArch(object):
         # ##################
         #  Create offset map
         # ##################
-        cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
-        cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
-        cy = tf.reshape(cy, [-1, height, width, 1])
+        cx   = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
+        cy   = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
+        cy   = tf.reshape(cy, [-1, height, width, 1])
         c_xy = tf.to_float(tf.stack([cx, cy], -1))
 
         anchors_tensor = tf.to_float(K.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]))
-        output_size = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
+        output_size    = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
 
         outputs = K.reshape(predictions, [-1, height, width, len(self.anchors), self.num_classes + 5])
 
         # ##################
         # Interpret outputs
         # ##################
-        box_xy          = K.sigmoid(outputs[..., :2])
-        box_wh          = K.exp(outputs[..., 2:4])
+        #  (Ref: YOLO-9000 paper)
+        box_xy          = K.sigmoid(outputs[..., :2]) + c_xy
+        box_wh          = K.exp(outputs[..., 2:4]) * anchors_tensor
         box_confidence  = K.sigmoid(outputs[..., 4:5])
         box_class_probs = K.softmax(outputs[..., 5:])
 
-        # Shift center points to its grid cell accordingly (Ref: YOLO-9000 paper)
-        box_xy = (box_xy + c_xy) / output_size
-        box_wh = (box_wh * anchors_tensor) / output_size
+        # Convert coordinates to relative coordinates (percentage)
+        box_xy = box_xy / output_size
+        box_wh = box_wh / output_size
 
         # Calculate corner points of bounding boxes
         box_mins  = box_xy - (box_wh / 2.)
         box_maxes = box_xy + (box_wh / 2.)
 
         # Y1, X1, Y2, X2
-        boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1],  # Y1 X1
+        boxes = K.concatenate([box_mins[..., 1:2], box_mins[..., 0:1],     # Y1 X1
                                box_maxes[..., 1:2], box_maxes[..., 0:1]])  # Y2 X2
 
-        return [boxes, box_confidence, box_class_probs]
+        outputs = K.concatenate([boxes, box_confidence, box_class_probs], axis=-1)
+
+        return outputs
 
     def compute_loss(self, predictions):
         """
         Keras does not support loss function during graph construction.
-
         A loss function can only be pass during model.compile(loss=loss_func)
         """
         raise NotImplemented

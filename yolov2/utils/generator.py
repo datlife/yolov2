@@ -1,5 +1,6 @@
 import cv2
 import math
+import numpy as np
 from keras.utils import Sequence
 
 
@@ -24,8 +25,8 @@ class DataGenerator(Sequence):
         """
         self.x = x
         self.y = y
-        self.batch_size  = batch_size
-        self.augment     = augment
+        self.batch_size          = batch_size
+        self.enable_augmentation = augment
 
     def __len__(self):
         return math.ceil(len(self.x) / self.batch_size)
@@ -37,7 +38,7 @@ class DataGenerator(Sequence):
         images = [cv2.imread(filename) for filename in batch_x]
         labels = self._process_labels(batch_y)
 
-        return images, labels
+        return np.asarray(images), labels
 
     def _process_labels(self, x, y):
         # @TODO: freaking delete this
@@ -74,6 +75,5 @@ class DataGenerator(Sequence):
                 # Construct Feature map ground truth
                 if r < grid_w and c < grid_h:
                     y_batch[i, c, r, :, :] = N_ANCHORS * [object_mask]
-
 
         return 0
