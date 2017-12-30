@@ -4,14 +4,15 @@ import argparse
 import numpy as np
 import config as cfg
 
-from yolov2.models import yolov2_darknet
-from yolov2.utils import draw, parse_config
+from yolov2.zoo import yolov2_darknet19
+from yolov2.utils.painter import draw_boxes
+from yolov2.utils.parser import parse_config
 
 
 def _main_():
     parser = argparse.ArgumentParser(description="Detect object in an image")
 
-    parser.add_argument('--path', type=str, default='./test/test_imgs/person.jpg',
+    parser.add_argument('--path', type=str, default='./test_imgs/person.jpg',
                         help="Path to image file")
 
     parser.add_argument('--weights', type=str, default='yolo-coco.weights',
@@ -23,7 +24,7 @@ def _main_():
     parser.add_argument('--iou', type=float, default=0.5,
                         help="Intersection over Union (IoU) value")
 
-    parser.add_argument('--threshold', type=float, default=0.6,
+    parser.add_argument('--threshold', type=float, default=0.5,
                         help="Score Threshold value (minimum accuracy)")
 
     # ############
@@ -35,12 +36,13 @@ def _main_():
     # ###################
     # Define Keras Model
     # ###################
-    model = yolov2_darknet(is_training      = False,
-                           img_size         = cfg.IMG_INPUT_SIZE,
-                           anchors          = anchors,
-                           num_classes      = cfg.N_CLASSES,
-                           iou              = args.iou,
-                           scores_threshold = args.threshold)
+    model = yolov2_darknet19(is_training      = False,
+                             img_size         = cfg.IMG_INPUT_SIZE,
+                             anchors          = anchors,
+                             num_classes      = cfg.N_CLASSES,
+                             iou              = args.iou,
+                             scores_threshold = args.threshold,
+                             max_boxes        = 100)
 
     model.load_weights(args.weights)
     model.summary()
@@ -50,10 +52,10 @@ def _main_():
     # #####################
     image = cv2.imread(args.path)
 
-    pred_bboxes, pred_classes, pred_scores = model.predict_on_batch(np.expand_dims(image, axis=0))
+    bboxes, scores, classes = model.predict_on_batch(np.expand_dims(image, axis=0))
 
     # Convert idx to label
-    pred_classes = [label_dict[idx] for idx in pred_classes]
+    classes = [label_dict[idx] for idx in classes]
 
     # #################
     # Display Result  #
@@ -61,12 +63,8 @@ def _main_():
     h, w, _ = image.shape
     if args.output_dir is not None:
         # Scale relative coordinates into actual coordinates
-        pred_bboxes  = [box * np.array([h, w, h, w]) for box in pred_bboxes]
-        print("pred_bboxes = {}".format(pred_bboxes))
-        print("pred_classes = {}".format(pred_classes))
-        print("pred_scores = {}".format(pred_scores))
-
-        result = draw(image, pred_bboxes, pred_classes, pred_scores)
+        bboxes  = [box * np.array([h, w, h, w]) for box in bboxes]
+        result = draw_boxes(image, bboxes, classes, scores)
         cv2.imwrite(os.path.join(args.output_dir, args.path.split('/')[-1].split('.')[0] + '_result.jpg'), result)
 
 

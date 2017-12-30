@@ -132,7 +132,8 @@ def _main_():
         # Build model for TF Serving
         config = tf.ConfigProto(graph_options=graph_options)
 
-        # # check for XLA Compilation
+        # @TODO: add XLA for higher performance (AOT for ARM, JIT for x86/GPUs)
+        # https://www.tensorflow.org/performance/xla/
         # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         with session.Session(config=config) as sess:
@@ -165,5 +166,5 @@ def _main_():
                                                                                             'graph_def')))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _main_()
