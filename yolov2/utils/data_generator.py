@@ -22,7 +22,7 @@ from yolov2.utils.box import Box, convert_bbox
 from yolov2.utils import augment_img
 
 from config import *
-from yolov2.softmaxtree import SoftMaxTree
+from yolov2.core.softmaxtree import SoftMaxTree
 # Get list of classes
 with open(CATEGORIES, 'r') as fl:
     CLASSES = np.array(fl.read().splitlines())

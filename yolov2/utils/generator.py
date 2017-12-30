@@ -13,8 +13,8 @@ class DataGenerator(Sequence):
     """
     def __init__(self, x, y, batch_size, augment=False):
         """
-            Constructor
-        :param x: - a list of image paths
+        Constructor
+        :param x: - a list of image paths for training
         :param y: - a dictionary containing ground truth objects, whereas:
                     Key : an image path
                     Values: a list of objects appearing in the image in format:

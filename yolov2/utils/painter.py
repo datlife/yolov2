@@ -2,9 +2,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-def draw(img, bboxes, classes, scores):
+def draw_boxes(img, bboxes, classes, scores):
     """
-          Drawing Bounding Box on Image
+    Drawing Bounding Boxes on Image
 
     :param img:
     :param bboxes:
@@ -60,5 +60,4 @@ def draw_fps(img, fps, detection_fps):
               fill=(0, 255, 0),
               label_size=3,
               font=font)
-
     return np.array(image)
