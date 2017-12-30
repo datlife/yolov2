@@ -10,13 +10,13 @@ from yolov2.core.detectors.yolov2 import yolov2_detector
 from yolov2.core.custom_layers import ImageResizer
 
 
-def yolov2_darknet(img_size,
-                   is_training,
-                   anchors,
-                   num_classes,
-                   iou=0.5,
-                   scores_threshold=0.0,
-                   max_boxes = 100):
+def yolov2_darknet19(img_size,
+                     is_training,
+                     anchors,
+                     num_classes,
+                     iou=0.5,
+                     scores_threshold=0.0,
+                     max_boxes = 100):
     """Definition of YOLOv2 using DarkNet19 as feature extractor
 
     :param img_size:    - an int - default image size that let ImageResizer to know how to resize the image
@@ -39,12 +39,7 @@ def yolov2_darknet(img_size,
 
     if is_training:
         return Model(inputs=inputs, outputs=outputs)
-
     else:
-        outputs = yolov2.post_process(outputs,
-                                      iou_threshold  = iou,
-                                      score_threshold= scores_threshold,
-                                      max_boxes      = max_boxes)
-
+        outputs = yolov2.post_process(outputs, iou, scores_threshold, max_boxes)
         return Model(inputs=inputs, outputs=outputs)
 
