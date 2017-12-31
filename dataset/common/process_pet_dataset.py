@@ -39,8 +39,8 @@ import tensorflow as tf
 # from object_detection.utils import dataset_util
 # from object_detection.utils import label_map_util
 
-import dataset.utils.dataset_util
-import dataset.utils.label_map_util
+import dataset_utils
+
 
 flags = tf.app.flags
 flags.DEFINE_string('data_dir', '', 'Root directory to raw pet dataset.')
@@ -75,7 +75,7 @@ def main(_):
     image_dir       = os.path.join(data_dir, 'images')
     annotations_dir = os.path.join(data_dir, 'annotations')
     examples_path   = os.path.join(annotations_dir, 'trainval.txt')
-    examples_list   = dataset.utils.dataset_util.read_examples_list(examples_path)
+    examples_list   = dataset_utils.read_examples_list(examples_path)
 
     # Test images are not included in the downloaded data set, so we shall perform our own split.
     random.seed(42)
@@ -126,32 +126,31 @@ def create_tf_record(output_filename,
       faces_only: If True, generates bounding boxes for pet faces.  Otherwise
         generates bounding boxes (as well as segmentations for full pet bodies).
     """
-    writer = tf.python_io.TFRecordWriter(output_filename)
-    for idx, example in enumerate(examples):
-        if idx % 100 == 0:
-            logging.info('On image %d of %d', idx, len(examples))
-        xml_path = os.path.join(annotations_dir, 'xmls', example + '.xml')
-        mask_path = os.path.join(annotations_dir, 'trimaps', example + '.png')
+    with open(output_filename, 'w') as writer:
+        for idx, example in enumerate(examples):
+            if idx % 100 == 0:
+                logging.info('On image %d of %d', idx, len(examples))
 
-        if not os.path.exists(xml_path):
-            logging.warning('Could not find %s, ignoring example.', xml_path)
-            continue
-        with tf.gfile.GFile(xml_path, 'r') as fid:
-            xml_str = fid.read()
-        xml = etree.fromstring(xml_str)
-        data = dataset.utils.dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
+            xml_path = os.path.join(annotations_dir, 'xmls', example + '.xml')
+            mask_path = os.path.join(annotations_dir, 'trimaps', example + '.png')
 
-        try:
-            tf_example = dict_to_tf_example(data,
-                                            mask_path,
-                                            label_map_dict,
-                                            image_dir,
-                                            faces_only=faces_only)
-            writer.write(tf_example.SerializeToString())
-        except ValueError:
-            logging.warning('Invalid example: %s, ignoring.', xml_path)
+            if not os.path.exists(xml_path):
+                logging.warning('Could not find %s, ignoring example.', xml_path)
+                continue
+            with tf.gfile.GFile(xml_path, 'r') as fid:
+                xml_str = fid.read()
+            xml  = etree.fromstring(xml_str)
+            data = dataset_utils.recursive_parse_xml_to_dict(xml)['annotation']
 
-    writer.close()
+            try:
+                tf_example = dict_to_tf_example(data,
+                                                mask_path,
+                                                label_map_dict,
+                                                image_dir,
+                                                faces_only=faces_only)
+                writer.write(tf_example.SerializeToString())
+            except ValueError:
+                logging.warning('Invalid example: %s, ignoring.', xml_path)
 
 
 def dict_to_tf_example(data,
@@ -245,34 +244,11 @@ def dict_to_tf_example(data,
         classes.append(label_map_dict[class_name])
         truncated.append(int(obj['truncated']))
         poses.append(obj['pose'].encode('utf8'))
+
         if not faces_only:
             mask_remapped = mask_np != 2
             masks.append(mask_remapped)
 
-    feature_dict = {
-        'image/height':             dataset.utils.dataset_util.int64_feature(height),
-        'image/width':              dataset.utils.dataset_util.int64_feature(width),
-        'image/filename':           dataset.utils.dataset_util.bytes_feature(data['filename'].encode('utf8')),
-        'image/source_id':          dataset.utils.dataset_util.bytes_feature(data['filename'].encode('utf8')),
-        'image/key/sha256':         dataset.utils.dataset_util.bytes_feature(key.encode('utf8')),
-        'image/encoded':            dataset.utils.dataset_util.bytes_feature(encoded_jpg),
-        'image/format':             dataset.utils.dataset_util.bytes_feature('jpeg'.encode('utf8')),
-        'image/object/bbox/xmin':   dataset.utils.dataset_util.float_list_feature(xmins),
-        'image/object/bbox/xmax':   dataset.utils.dataset_util.float_list_feature(xmaxs),
-        'image/object/bbox/ymin':   dataset.utils.dataset_util.float_list_feature(ymins),
-        'image/object/bbox/ymax':   dataset.utils.dataset_util.float_list_feature(ymaxs),
-        'image/object/class/text':  dataset.utils.dataset_util.bytes_list_feature(classes_text),
-        'image/object/class/label': dataset.utils.dataset_util.int64_list_feature(classes),
-        'image/object/difficult':   dataset.utils.dataset_util.int64_list_feature(difficult_obj),
-        'image/object/truncated':   dataset.utils.dataset_util.int64_list_feature(truncated),
-        'image/object/view':        dataset.utils.dataset_util.bytes_list_feature(poses),
-    }
-    if not faces_only:
-        mask_stack = np.stack(masks).astype(np.float32)
-        masks_flattened = np.reshape(mask_stack, [-1])
-        feature_dict['image/object/mask'] = (dataset.utils.dataset_util.float_list_feature(masks_flattened.tolist()))
-
-    example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
     return example
 
 
