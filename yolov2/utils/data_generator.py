@@ -22,11 +22,42 @@ from yolov2.utils.box import Box, convert_bbox
 from yolov2.utils import augment_img
 
 from config import *
-from yolov2.core.softmaxtree import SoftMaxTree
-# Get list of classes
-with open(CATEGORIES, 'r') as fl:
-    CLASSES = np.array(fl.read().splitlines())
-    print(CLASSES)
+
+import numpy as np
+import cv2
+import copy
+from yolov2.utils.box import Box
+
+
+def augment_img(img, objects):
+    aug_img      = np.copy(img)
+    copy_objects = copy.deepcopy(objects)
+    HEIGHT, WIDTH, c = img.shape
+    # scale the image
+    scale = np.random.uniform() / 10. + 1.
+    aug_img = cv2.resize(aug_img, (0, 0), fx=scale, fy=scale)
+
+    # translate the image
+    max_offx = (scale - 1.) * WIDTH
+    max_offy = (scale - 1.) * HEIGHT
+    offx = int(np.random.uniform() * max_offx)
+    offy = int(np.random.uniform() * max_offy)
+    aug_img = aug_img[offy: (offy + HEIGHT), offx: (offx + WIDTH)]
+
+    # # Changing color
+
+    # fix object's position and size
+    new_labels = []
+    for obj in copy_objects:
+        gt_box, gt_label = obj
+        xc, yc, w, h = gt_box.to_array()
+        xc = int(xc * scale - offx)
+        xc = max(min(xc, WIDTH), 0)
+        yc = int(yc * scale - offy)
+        yc = max(min(yc, HEIGHT), 0)
+        new_labels.append([Box(xc, yc, w*scale, h*scale), gt_label])
+
+    return aug_img, new_labels
 
 
 class threadsafe_iter:

@@ -8,19 +8,6 @@ class Box(object):
         self.w = w
         self.h = h
 
-    def to_opencv_format(self):
-        """
-        Convert bounding box to OpenCV format
-        :return:  [[(x1, y1), (x2, y2)]] (numpy int)
-        """
-        x1 = int(self.x - self.w/2)
-        y1 = int(self.y - self.h/2)
-        x2 = int(self.x + self.w/2)
-        y2 = int(self.y + self.h/2)
-        opencv_box = [[(x1, y1), (x2, y2)]]
-
-        return opencv_box
-
     def to_relative_size(self, img_size=(1280, 960)):
         """
         
@@ -36,7 +23,6 @@ class Box(object):
 
     def to_abs_size(self, img_size=(1280, 960)):
         """
-
         :param img_size: 
         :return: 
         """
@@ -44,11 +30,10 @@ class Box(object):
 
         if self.x > 1.0:  # Make sure current box is in relative format
             return self.x, self.y, self.w, self.h
-
-        self.x = self.x   * width
-        self.y = self.y   * height
-        self.w  = self.w   * width
-        self.h  = self.h   * height
+        self.x *= width
+        self.y *= height
+        self.w *= width
+        self.h *= height
         return self.x, self.y, self.w, self.h
 
     def to_array(self):
@@ -128,7 +113,9 @@ def build_box_from_pd(bbox):
 
     return Box(xc, yc, w, h)
 
+
 # # TEST CASE ##
+
 if __name__ == "__main__":
     b1 = Box(1, 1, 3, 3)
     b2 = Box(1, 1, 3, 3)
