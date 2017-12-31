@@ -36,11 +36,11 @@ def yolov2_loss(anchors, num_classes):
 
         wh_loss = tf.square(tf.sqrt(pred_boxes[..., 0:2]) - tf.sqrt(gt_boxes[..., 0:2]))
         wh_loss = tf.reduce_sum(wh_loss)
+
         return xy_loss + wh_loss
 
     def compute_classification_loss(gt_classes, pred_classes):
-        cls_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(gt_classes, dtype=tf.int32),
-                                                                  logits=pred_classes)
+        cls_loss = tf.nn.softmax_cross_entropy_with_logits(labels=gt_classes, logits=pred_classes)
         cls_loss = tf.reduce_sum(cls_loss)
         return cls_loss
 

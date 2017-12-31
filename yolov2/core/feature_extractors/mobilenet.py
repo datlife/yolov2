@@ -29,35 +29,35 @@ def mobile_net(inputs, include_top=False, n_classes=1000, alpha=1.0, depth_multi
 
     fine_grained_layers = []
     shape = (1, 1, int(1024 * alpha))
+    with K.name_scope('MobileNet'):
+        x = _conv_block(inputs, 32, alpha, strides=(2, 2))
+        x = _depthwise_conv_block(x, 64,  alpha, depth_multiplier, block_id=1)
+        x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=2, strides=(2, 2))
+        x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=3)
+        x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=4, strides=(2, 2))
+        x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=5)
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=6, strides=(2, 2))
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=7)
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=8)
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=9)
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=10)
+        x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=11)
+        fine_grained_layers.append(x)
 
-    x = _conv_block(inputs, 32, alpha, strides=(2, 2))
-    x = _depthwise_conv_block(x, 64,  alpha, depth_multiplier, block_id=1)
-    x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=2, strides=(2, 2))
-    x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=3)
-    x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=4, strides=(2, 2))
-    x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=5)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=6, strides=(2, 2))
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=7)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=8)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=9)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=10)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=11)
-    fine_grained_layers.append(x)
+        x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=12, strides=(2, 2))
+        x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=13)
 
-    x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=12, strides=(2, 2))
-    x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=13)
+        if include_top:
+            x = GlobalAvgPool2D()(x)
+            x = Reshape(shape, name='reshape_1')(x)
+            x = Dropout(0.0, name='dropout')(x)
 
-    if include_top:
-        x = GlobalAvgPool2D()(x)
-        x = Reshape(shape, name='reshape_1')(x)
-        x = Dropout(0.0, name='dropout')(x)
+            x = Conv2D(n_classes, (1, 1), padding='same', name='conv_preds')(x)
+            x = Activation('softmax', name='act_softmax')(x)
+            x = Reshape((n_classes,), name='reshape_2')(x)
+            x = Model(inputs, x)
 
-        x = Conv2D(n_classes, (1, 1), padding='same', name='conv_preds')(x)
-        x = Activation('softmax', name='act_softmax')(x)
-        x = Reshape((n_classes,), name='reshape_2')(x)
-        x = Model(inputs, x)
-
-    return x, fine_grained_layers
+        return x, fine_grained_layers
 
 
 def _conv_block(inputs, filters, alpha, kernel=(3, 3), strides=(1, 1), name='conv1'):
@@ -73,15 +73,22 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha, depth_multiplie
     A depthwise convolution block.
     """
     pointwise_conv_filters = int(pointwise_conv_filters * alpha)
-    x = DepthwiseConv2D((3, 3), padding='same',
-                        depth_multiplier=depth_multiplier, strides=strides,
-                        use_bias=False, name='conv_dw_%d' % block_id)(inputs)
-    x = BatchNormalization(name='conv_dw_%d_bn' % block_id)(x)
-    x = Activation(relu6, name='conv_dw_%d_relu' % block_id)(x)
 
-    x = Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1), name='conv_pw_%d' % block_id)(x)
-    x = BatchNormalization(name='conv_pw_%d_bn' % block_id)(x)
-    return Activation(relu6, name='conv_pw_%d_relu' % block_id)(x)
+    with K.name_scope('DepthWiseConvBlock_%s' % block_id):
+
+        x = DepthwiseConv2D((3, 3), padding='same',
+                            depth_multiplier=depth_multiplier, strides=strides,
+                            use_bias=False, name='conv_dw_%d' % block_id)(inputs)
+
+        x = BatchNormalization(name='conv_dw_%d_bn' % block_id)(x)
+        x = Activation(relu6, name='conv_dw_%d_relu' % block_id)(x)
+
+        x = Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False,
+                   strides=(1, 1), name='conv_pw_%d' % block_id)(x)
+
+        x = BatchNormalization(name='conv_pw_%d_bn' % block_id)(x)
+        x = Activation(relu6, name='conv_pw_%d_relu' % block_id)(x)
+        return x
 
 
 class DepthwiseConv2D(Conv2D):

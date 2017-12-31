@@ -7,12 +7,6 @@ def mobilenet_detector(feature_map,
                        fine_grained_layers):
     """
     MobileNet Detector Implementation
-    :param feature_extractor:
-    :param num_classes:
-    :param num_anchors:
-    :param fine_grained_layers
-
-    :return:
     """
     x = _depthwise_conv_block(feature_map, 1024, 1.0, block_id=14)
     x = _depthwise_conv_block(x, 1024, 1.0, block_id=15)
