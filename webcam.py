@@ -1,12 +1,20 @@
+"""
+Demo YOLOv2 using webcam or any video source
+
+In order to find a video source, type `ls -l /dev/video*` in UNIX terminal
+
+"""
+import os
 import cv2
-import numpy as np
 import time
-import config as cfg
+import yaml
+import numpy as np
+
 
 import multiprocessing as mp
 from threading import Thread
 
-from yolov2.utils.parser import parse_config
+from yolov2.utils.parser import parse_label_map
 from yolov2.utils.painter import draw_boxes, draw_fps
 from yolov2.utils.tfserving import DetectionClient, DetectionServer
 
@@ -14,14 +22,8 @@ from yolov2.utils.tfserving import DetectionClient, DetectionServer
 import argparse
 parser = argparse.ArgumentParser(description="Webcam demo")
 
-parser.add_argument('--server', type=str, default='localhost:9000',
-                    help="PredictionService host:port [default=localhost:9000]")
-
-parser.add_argument('--model', type=str, default='yolov2',
-                    help="tf serving model name [default=yolov2]")
-
-parser.add_argument('--video_source', type=int, default=0,
-                    help="Source to webcam [default = 0]")
+parser.add_argument('--video_source', type=int, default=1,
+                    help="Source to webcam [default = 1]")
 
 
 def main():
@@ -29,31 +31,39 @@ def main():
     # Parse Config
     # ############
     ARGS = parser.parse_args()
-    _, label_dict = parse_config(cfg)
+    with open('config.yml', 'r') as stream:
+        config = yaml.load(stream)
+
+    interference = config['interference']
+    label_dict = parse_label_map(config['label_map'])
+    model_name = config['model']['name']
+    model_path = os.path.join(config['deploy_params']['output_path'], model_name)
+    server     = interference['server']
 
     # #####################
     # Init Detection Server
     # #####################
-    tf_serving_server = DetectionServer(model=ARGS.model, model_path='/tmp/yolov2/')
+    tf_serving_server = DetectionServer(model=model_name, model_path=model_path)
     tf_serving_server.start()
 
     # Wait for server to start
     time.sleep(2.0)
     if tf_serving_server.is_running():
-        print("Initialized TF Serving at {} with model {}".format(ARGS.server, ARGS.model))
+        print("Initialized TF Serving at {} with model {}".format(server, model_name))
 
         # ###############
         # Init Client &
         # Webcam Streamer
         # ################
-        object_detector = DetectionClient(ARGS.server, ARGS.model, label_dict, verbose=True)
-
-        video_capture   = WebcamVideoStream(ARGS.video_source, width=480, height=640).start()
+        object_detector = DetectionClient(server, model_name, label_dict, verbose=True)
+        video_capture   = WebcamVideoStream(ARGS.video_source,
+                                            width=interference['frame_width'],
+                                            height=interference['frame_height']).start()
 
         # ##########
         # Start Demo
         # ###########
-        viewer = WebCamViewer(video_capture, object_detector, score_threshold=0.5)
+        viewer = WebCamViewer(video_capture, object_detector, score_threshold=interference['score_threshold'])
         viewer.run()
 
         # ############

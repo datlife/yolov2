@@ -35,7 +35,6 @@ def yolov2_darknet19(img_size,
     :return: the outputs of model
     """
     inputs = Input(shape=(None, None, 3), name='image_input')
-    inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
 
     # Construct Keras model, this function return a build blocks
     # of YOLOv2 model
@@ -43,7 +42,9 @@ def yolov2_darknet19(img_size,
                             detector         = yolov2_detector,
                             anchors          = anchors,
                             num_classes      = num_classes)
-    outputs = yolov2.predict(inputs)
+
+    resized_inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
+    outputs = yolov2.predict(resized_inputs)
 
     if is_training:
         return Model(inputs=inputs, outputs=outputs)

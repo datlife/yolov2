@@ -1,6 +1,5 @@
 import re
 import csv
-
 import numpy as np
 from itertools import islice
 
@@ -18,48 +17,48 @@ def parse_inputs(filename, label_dict):
     label_dict : an encoding dictionary mapping class names to indinces
 
     Returns:
-    --------
-    training_instance - a dictionary mapping img path to list of objects
-            keys: a list of image paths
-            values: a list of objects in each image in format [x1, y1, x2, y2, encoded_label]
-            e.g dict[image_path] = list of obsjects in that image
 
     """
     training_instances = dict()
-    with open(filename, "rb") as f:
+    with open(filename, "r") as f:
         reader = csv.reader(f)
         for line in islice(reader, 1, None):
             if not line:
                 continue  # Ignore empty line
 
-            img_path       = line[0]
-            cls_name       = line[-1]
+            img_path = line[0]
+            cls_name = line[-1]
             x1, y1, x2, y2 = [float(x) for x in line[1:-1]]
-            an_object      = [x1, y1, x2, y2, label_dict[cls_name]]
+            an_object = [y1, x1, y2, x2,  label_dict[cls_name]]
 
             if img_path in training_instances:
                 training_instances[img_path].append(an_object)
             else:
                 training_instances[img_path] = [an_object]
-
-    inputs  = training_instances.keys()
-    labels  = training_instances
+    inputs = training_instances.keys()
+    labels = {k: np.stack(v).flatten() for k, v in training_instances.iteritems()}
 
     return inputs, labels
 
 
-def parse_config(cfg):
-    # Config Anchors
-    anchors = []
-    with open(cfg.ANCHORS, 'r') as f:
-        data = f.read().splitlines()
-        for line in data:
-            numbers = re.findall('\d+.\d+', line)
-            anchors.append((float(numbers[0]), float(numbers[1])))
+def parse_label_map(map_file):
+    try:
+        with open(map_file, mode='r') as txt_file:
+            class_names = [c.strip() for c in txt_file.readlines()]
 
-    # Load class names
-    with open(cfg.CATEGORIES, mode='r') as txt_file:
-        class_names = [c.strip() for c in txt_file.readlines()]
+        label_dict = {v: k for v, k in enumerate(class_names)}
+        return label_dict
 
-    label_dict = {v: k for v, k in enumerate(class_names)}
-    return np.array(anchors), label_dict
+    except IOError as e:
+        print("\nPlease check config.py file")
+        raise(e)
+
+
+class Dict2Obj(object):
+    """ Convert dict to object """
+    def __init__(self, d):
+        for a, b in d.items():
+            if isinstance(b, (list, tuple)):
+                setattr(self, a, [Dict2Obj(x) if isinstance(x, dict) else x for x in b])
+            else:
+                setattr(self, a, Dict2Obj(b) if isinstance(b, dict) else b)
