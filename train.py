@@ -28,9 +28,8 @@ python train.py \
 
 """
 import cv2
-import numpy as np
+import itertools
 import config as cfg
-
 import keras
 import tensorflow as tf
 import keras.backend as K
@@ -38,26 +37,26 @@ import keras.backend as K
 from yolov2.zoo import yolov2_darknet19
 from yolov2.core.loss import yolov2_loss
 
-from yolov2.utils.parser import parse_config, parse_inputs
 from yolov2.utils.callbacks import create_callbacks
+from yolov2.utils.parser import parse_config, parse_inputs
+from sklearn.model_selection import train_test_split
 
 from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Train YOLOv2")
-parser.add_argument('--csv_file',
-                    help="Path to CSV training data set", type=str, default=None)
+parser.add_argument('--csv_file', type=str, default=None,
+                    help="Path to CSV training data set")
 
-parser.add_argument('--weights',
-                    help="Path to pre-trained weight file", type=str, default=None)
+parser.add_argument('--weights', type=str, default=None,
+                    help="Path to pre-trained weight file")
 
-parser.add_argument('--epochs',
-                    help='Number of epochs for training', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=10,
+                    help='Number of epochs for training')
 
 parser.add_argument('--batch_size', type=int, default=1,
                     help='Number of batch size')
 
 parser.add_argument('--learning_rate', type=float, default=0.00001)
-
 
 parser.add_argument('--backup_dir', type=str, default='./backup/',
                     help='Path to to backup model directory')
@@ -83,7 +82,8 @@ def _main_():
     # ###############
     # @TODO: use TFRecords ?
     # @TODO: Create K-fold cross validation training procedure
-    inputs, labels = parse_inputs(training_path, label_dict)
+    inv_map = {v: k for k, v in label_dict.iteritems()}
+    inputs, labels = parse_inputs(training_path, inv_map)
 
     # ###################
     # Define Keras Model
@@ -103,14 +103,14 @@ def _main_():
     model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
                   loss     = yolov2_loss(anchors, cfg.N_CLASSES))
 
-    from sklearn.model_selection import train_test_split
-
     for current_epoch in range(epochs):
-
         # Create 10-fold split
         x_train, x_val = train_test_split(inputs, test_size=0.2)
         y_train = [labels[k] for k in x_train]
         y_val   = [labels[k] for k in x_val]
+
+        print("Number of training samples: {} || {}".format(len(x_train), len(y_train)))
+        print("Number of validation samples: {} || {}".format(len(x_val), len(y_val)))
 
         history = model.fit_generator(generator       = data_generator(x_train, y_train),
                                       steps_per_epoch = 1000,
@@ -119,61 +119,42 @@ def _main_():
                                       verbose=1,
                                       workers=0)
 
+    model.save_weights('trained_model.h5')
 
-def data_generator(images, labels, shuffle=True, batch_size=128):
-    batch = input_func(images, labels, shuffle, batch_size)
+
+def data_generator(images, labels, shuffle=True, batch_size=4):
+    dataset    = input_func(images, labels, shuffle, batch_size)
+    iterator   = dataset.make_one_shot_iterator()
+    next_batch = iterator.get_next()
     while True:
-        yield K.batch_get_value(batch)
+        yield K.get_session().run(next_batch)
 
 
-def input_func(images, labels, shuffle=True, batch_size=128):
+def input_func(images, labels, shuffle=True, batch_size=8):
 
-    def map_func(image, label):
-        img = cv2.imread(image)
-        height, width, _ = img.shape
+    def read_img_file(filename, label):
+        image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image, (300, 300))
+        return image, label
 
-        output_width  = cfg.IMG_INPUT_SIZE / cfg.SHRINK_FACTOR
-        output_height = cfg.IMG_INPUT_SIZE / cfg.SHRINK_FACTOR
+    def process_label(img, label):
+        label = tf.reshape(label, (-1, 5))
+        gt_boxes, gt_classes = tf.split(label, [4, 1], 1)
+        return img, gt_boxes, tf.squeeze(gt_classes, axis=1)
 
-        x_train = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        y_train = np.zeros((output_height, output_width,  cfg.N_ANCHORS, 5 + cfg.N_CLASSES))
-
-        for obj in label:
-            xc, yc, w, h, label_idx = obj  # convert label to int
-            one_hot_encoding = np.eye(cfg.N_CLASSES)[label_idx]
-
-            # convert to relative value. A cell in grid map
-            gt_label = np.concatenate([[xc/float(width), yc/float(height),
-                                        w/float(width), h/float(height)],
-                                       [1.0],
-                                       one_hot_encoding])
-
-            # @TODO: this can be done in loss function or SparseTensor
-            center_x = xc * output_width
-            center_y = yc * output_height
-            r = int(np.floor(center_x))
-            c = int(np.floor(center_y))
-
-            # Construct Feature map ground truth
-            if r < output_width and c < output_height:
-                y_train[c, r, :, :] = cfg.N_ANCHORS * [gt_label]
-
-        return [tf.cast(x_train, tf.float32), tf.cast(y_train, tf.float32)]
-
-    dataset = tf.data.Dataset.from_tensor_slices((images, labels))
-    dataset = dataset.map(map_func)
-
+    dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),
+                                             (tf.string, tf.float32),
+                                             (tf.TensorShape([]), tf.TensorShape([None])))
+    dataset = dataset.map(lambda filename, label:
+                          tuple(tf.py_func(read_img_file,
+                                           [filename, label],
+                                           [tf.uint8, label.dtype])))
+    dataset = dataset.map(process_label)
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
+        dataset = dataset.shuffle()
 
-    dataset = dataset.repeat()
     dataset = dataset.batch(batch_size)
-    iterator = dataset.make_one_shot_iterator()
-
-    # This is tensors
-    inputs, target = iterator.get_next()
-
-    return inputs, target
+    return dataset
 
 
 if __name__ == "__main__":

@@ -12,14 +12,11 @@ In this example, we export YOLOv2 with darknet-19 as feature extractor
 from __future__ import print_function
 
 import os
-import argparse
-
+import yaml
+import numpy as np
 import tensorflow as tf
 import keras.backend as K
-
-import config as cfg
 from yolov2.zoo import yolov2_darknet19
-from yolov2.utils.parser import parse_config
 
 # TF Libraries to export model into .pb file
 from tensorflow.python.client import session
@@ -29,35 +26,26 @@ from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.tools.graph_transforms import TransformGraph
 
 
-parser = argparse.ArgumentParser("Export Keras Model to TensorFlow Serving")
-
-parser.add_argument('--output_dir', type=str, default='/tmp/yolov2',
-                    help="Export path [default=/tmp/yolov2/")
-
-parser.add_argument('--version', type=str, default='1',
-                    help="Model Version [default=1]", )
-
-parser.add_argument('--weight_file', type=str, default=None,
-                    help="Path to pre-trained weight files [default=None]")
-
-parser.add_argument('--iou', type=float, default=0.6,
-                    help="IoU value for Non-max suppression [default = 0.5]")
-
-parser.add_argument('--threshold', type=float, default=0.0,
-                    help="Threshold value to display box [default=0.0]")
-
-
 def _main_():
-    # ###############
-    # Parse Config  #
-    # ###############
-    args = parser.parse_args()
-    anchors, label_dict = parse_config(cfg)
+    # ############
+    # Parse Config
+    # ############
+    with open('config.yml', 'r') as stream:
+        config = yaml.load(stream)
 
-    export_path = os.path.join(args.output_dir, args.version)
-
-    if not os.path.isfile(args.weight_file):
+    if not os.path.isfile(config['model']['weight_file']):
         raise IOError("Weight file is invalid")
+
+    anchors  = np.array(config['anchors'])
+    # #################
+    # Setup export path
+    ###################
+    version    = config['deploy_params']['version']
+    model_name = config['model']['name']
+    base_dir   = config['deploy_params']['output_path']
+    output_dir = os.path.join(base_dir, model_name)
+
+    export_path = os.path.join(output_dir, str(version))
 
     # ######################
     #  Interference Pipeline
@@ -65,18 +53,20 @@ def _main_():
     with K.get_session() as sess:
         K.set_learning_phase(0)
 
+        model_cfg  = config['model']
+        deploy_cfg = config['deploy_params']
         # ###################
         # Define Keras Model
         # ###################
         model = yolov2_darknet19(is_training = False,
-                                 img_size    = cfg.IMG_INPUT_SIZE,
+                                 img_size    = model_cfg['image_size'],
                                  anchors     = anchors,
-                                 num_classes = cfg.N_CLASSES,
-                                 iou         = args.iou,
-                                 scores_threshold = args.threshold,
-                                 max_boxes   = 100)
+                                 num_classes = model_cfg['num_classes'],
+                                 max_boxes   = deploy_cfg['maximum_boxes'],
+                                 iou         = deploy_cfg['iou_threshold'],
+                                 scores_threshold = deploy_cfg['score_threshold'])
 
-        model.load_weights(args.weight_file)
+        model.load_weights(model_cfg['weight_file'])
         model.summary()
 
         # ########################
@@ -158,11 +148,11 @@ def _main_():
             builder.save()
 
             # Visualize graph in tensor-board
-            summary = tf.summary.FileWriter(os.path.join(args.output_dir, 'graph_def'))
+            summary = tf.summary.FileWriter(os.path.join(output_dir, 'graph_def'))
             summary.add_graph(sess.graph)
 
     print("\n\nModel is ready for TF Serving. (saved at {}/saved_model.pb)".format(export_path))
-    print("Execute `tensorboard --logdir {}` to view graph in TF Board".format(os.path.join(args.output_dir,
+    print("Execute `tensorboard --logdir {}` to view graph in TF Board".format(os.path.join(output_dir,
                                                                                             'graph_def')))
 
 

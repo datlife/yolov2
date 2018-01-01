@@ -1,5 +1,11 @@
 """
-Construct Original YOLOv2 model
+Build YOLOv2 Model
+
+The idea is that YOLOv2 consists of feature extractor and detector.
+By using YOLOv2MetaArch, one can swap different types o feature extractor (DarkNet19, MobileNet, NASNet, DenseNet)
+and different types of detector, too.
+
+In this file, we construct a standard YOLOv2 using Darknet19 as feature extractor.
 """
 from keras.layers import Input
 from keras.models import Model
@@ -21,7 +27,7 @@ def yolov2_darknet19(img_size,
 
     :param img_size:    - an int - default image size that let ImageResizer to know how to resize the image
     :param is_training: - a boolean
-    :param anchors:     - a numpy of float array - list of anchors
+    :param anchors:     - a float numpy array - list of anchors
     :param num_classes: - an int - number of classes in the dataset
     :param iou:         - a float - Intersection over Union value (only used when is_training = False)
     :param scores_threshold: - a float - Minimum accuracy value (only used when is_training = False)
@@ -29,13 +35,15 @@ def yolov2_darknet19(img_size,
     :return: the outputs of model
     """
     inputs = Input(shape=(None, None, 3), name='image_input')
-    resized_inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
+    inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
 
+    # Construct Keras model, this function return a build blocks
+    # of YOLOv2 model
     yolov2 = YOLOv2MetaArch(feature_extractor= darknet19,
                             detector         = yolov2_detector,
                             anchors          = anchors,
                             num_classes      = num_classes)
-    outputs = yolov2.predict(resized_inputs)
+    outputs = yolov2.predict(inputs)
 
     if is_training:
         return Model(inputs=inputs, outputs=outputs)

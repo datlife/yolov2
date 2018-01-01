@@ -1,16 +1,19 @@
+"""
+Predict one image (for testing)
+"""
 import os
 import cv2
+import yaml
 import argparse
 import numpy as np
-import config as cfg
 
 from yolov2.zoo import yolov2_darknet19
 from yolov2.utils.painter import draw_boxes
-from yolov2.utils.parser import parse_config
+from yolov2.utils.parser import parse_label_map
 
 
 def _main_():
-    parser = argparse.ArgumentParser(description="Detect object in an image")
+    parser = argparse.ArgumentParser(description="Detect objects in an image")
 
     parser.add_argument('--path', type=str, default='./test_imgs/person.jpg',
                         help="Path to image file")
@@ -31,15 +34,20 @@ def _main_():
     # Parse Config
     # ############
     args = parser.parse_args()
-    anchors, label_dict = parse_config(cfg)
+    with open('config.yml', 'r') as stream:
+        config = yaml.load(stream)
+
+    anchors    = np.array(config['anchors'])
+    label_dict = parse_label_map(config['label_map'])
 
     # ###################
     # Define Keras Model
     # ###################
+    model_cfg  = config['model']
     model = yolov2_darknet19(is_training      = False,
-                             img_size         = cfg.IMG_INPUT_SIZE,
+                             img_size         = model_cfg['image_size'],
                              anchors          = anchors,
-                             num_classes      = cfg.N_CLASSES,
+                             num_classes      = model_cfg['num_classes'],
                              iou              = args.iou,
                              scores_threshold = args.threshold,
                              max_boxes        = 100)
