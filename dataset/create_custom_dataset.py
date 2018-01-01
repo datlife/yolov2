@@ -2,33 +2,38 @@
 This script creates a custom dataset for training and evaluation. It will generate:
 
    + a CSV training file
-   + a CSV validation file (optional: if split is enabled)
    + a categories text file to map indices to label names.
    + an anchor text file (depending on number of anchors, default = 5)
 
 Requirement:
 -----------
-   + a text file, containing ground truths, in this following format:
-        /absolute_path/to/image , x1, y1, x2, y2, label
+   + a text file, containing ground truths, in following format:
+        image1.jpg , x1, y1, x2, y2, label
+        image2.jpg, x1, y1, x2, y2, label2
+
+    whereas:
+       image1.jpg    : a str  - absolute image path
+       x1, y1, x2, y2: float  - absolute object coordinates
+       label:          string - name of label
 
 Example usage:
 -------------
 python create_custom_dataset.py
- --path       /path/to/text_file.txt
- --output_dir ./dataset/my_new_dataset
+ --data_file     /path/to/text_file.txt
  --num_anchors   5
- --split       True
-
+ --output_dir   ./dataset/new_dataset
+s
 Return
 ------
-  yolov2_darknet
   |- dataset
      | - my_new_data_set
+         | --  config.py
          | --  categories.txt
          | --  anchors.txt
          | --  training_data.csv
-         | --  testing_data.csv
 """
+# https://www.tensorflow.org/programmers_guide/datasets
+
 import os
 import csv
 import numpy as np
@@ -50,10 +55,8 @@ parser.add_argument('-o', '--output_dir',
 parser.add_argument('-n', '--number_anchors',
                     help="Number of anchors [default = 5]", type=int, default=5)
 
-parser.add_argument('-s', '--split',
-                    help='Splitting data into training/validation set at ratio 0.8/0.2', type=bool, default=False)
 
-
+# @TODO: Stratifield Kfold for splitting dataset
 def main():
     arguments = parser.parse_args()
     path = arguments.path
