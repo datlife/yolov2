@@ -20,11 +20,12 @@ model:
 ##########################
 # Train Hyper-parameters #
 ##########################
-train_params:
+training_params:
   epochs:          50
   batch_size:      32
   steps_per_epoch: 1000
   learning_rate:   0.00001
+  backup_dir:      ./backup   # store best trained model and logs for tensorboard
 
 #########################
 # Deployment Parameters #

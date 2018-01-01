@@ -28,9 +28,10 @@ python train.py \
 
 """
 import cv2
+import yaml
 import itertools
-import config as cfg
 import keras
+import numpy as np
 import tensorflow as tf
 import keras.backend as K
 
@@ -38,7 +39,7 @@ from yolov2.zoo import yolov2_darknet19
 from yolov2.core.loss import yolov2_loss
 
 from yolov2.utils.callbacks import create_callbacks
-from yolov2.utils.parser import parse_config, parse_inputs
+from yolov2.utils.parser import parse_inputs, parse_label_map
 from sklearn.model_selection import train_test_split
 
 from argparse import ArgumentParser
@@ -50,32 +51,30 @@ parser.add_argument('--csv_file', type=str, default=None,
 parser.add_argument('--weights', type=str, default=None,
                     help="Path to pre-trained weight file")
 
-parser.add_argument('--epochs', type=int, default=10,
-                    help='Number of epochs for training')
-
-parser.add_argument('--batch_size', type=int, default=1,
-                    help='Number of batch size')
-
-parser.add_argument('--learning_rate', type=float, default=0.00001)
-
-parser.add_argument('--backup_dir', type=str, default='./backup/',
-                    help='Path to to backup model directory')
-
 
 def _main_():
     # ###############
     # PARSE CONFIG  #
     # ###############
     args          = parser.parse_args()
+
+    with open('config.yml', 'r') as stream:
+        cfg = yaml.load(stream)
+
+    training_cfg = cfg['training_params']
     training_path = args.csv_file
-    weight_file   = args.weights
-    batch_size    = args.batch_size
-    epochs        = args.epochs
-    learning_rate = args.learning_rate  # this model has been pre-trained, LOWER learning rate is needed
-    backup_dir    = args.backup_dir
+
+    weight_file   = cfg['model']['weight_file']
+    num_classes   = cfg['model']['num_classes']
+    image_size    = cfg['model']['image_size']
+    epochs        = training_cfg['epochs']
+    batch_size    = training_cfg['batch_size']
+    learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
+    backup_dir    = training_cfg['backup_dir']
 
     # Config Anchors and encoding dict
-    anchors, label_dict = parse_config(cfg)
+    anchors    = np.array(cfg['anchors'])
+    label_dict = parse_label_map(cfg['label_map'])
 
     # ###############
     # PREPARE DATA  #
@@ -89,9 +88,9 @@ def _main_():
     # Define Keras Model
     # ###################
     model = yolov2_darknet19(is_training= True,
-                             img_size   = cfg.IMG_INPUT_SIZE,
+                             img_size   = image_size,
                              anchors    = anchors,
-                             num_classes= cfg.N_CLASSES)
+                             num_classes= num_classes)
 
     if weight_file:
         model.load_weights(weight_file)
@@ -101,7 +100,7 @@ def _main_():
     # COMPILE AND TRAIN #
     # ###################
     model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
-                  loss     = yolov2_loss(anchors, cfg.N_CLASSES))
+                  loss     = yolov2_loss(anchors, num_classes))
 
     for current_epoch in range(epochs):
         # Create 10-fold split
@@ -119,29 +118,37 @@ def _main_():
                                       verbose=1,
                                       workers=0)
 
+        # Evaluate y_val and save summaries to tensorboard
+
     model.save_weights('trained_model.h5')
 
 
 def data_generator(images, labels, shuffle=True, batch_size=4):
-    dataset    = input_func(images, labels, shuffle, batch_size)
-    iterator   = dataset.make_one_shot_iterator()
+    dataset = input_func(images, labels, shuffle, batch_size)
+    iterator = dataset.make_one_shot_iterator()
     next_batch = iterator.get_next()
     while True:
         yield K.get_session().run(next_batch)
 
 
 def input_func(images, labels, shuffle=True, batch_size=8):
-
     def read_img_file(filename, label):
         image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
-        image = cv2.resize(image, (300, 300))
         return image, label
 
     def process_label(img, label):
+        height = tf.shape(img)[0]
+        width = tf.shape(img)[1]
         label = tf.reshape(label, (-1, 5))
-        gt_boxes, gt_classes = tf.split(label, [4, 1], 1)
-        return img, gt_boxes, tf.squeeze(gt_classes, axis=1)
+        boxes, classes = tf.split(label, [4, 1], 1)
+        boxes = boxes / tf.cast([[height, width, height, width]], tf.float32)
+        boxes   = tf.expand_dims(boxes, 0)
+        img     = tf.expand_dims(img, 0)
+        classes = tf.squeeze(classes, axis=1)
 
+        return img, boxes, classes
+
+    # a hack to handle list with diffrent element size.
     dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),
                                              (tf.string, tf.float32),
                                              (tf.TensorShape([]), tf.TensorShape([None])))
@@ -151,9 +158,8 @@ def input_func(images, labels, shuffle=True, batch_size=8):
                                            [tf.uint8, label.dtype])))
     dataset = dataset.map(process_label)
     if shuffle:
-        dataset = dataset.shuffle()
+        dataset = dataset.shuffle(buffer_size=300)
 
-    dataset = dataset.batch(batch_size)
     return dataset
 
 
