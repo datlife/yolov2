@@ -6,7 +6,6 @@ YOLOv2 Meta-Architecture
 In this file, we define three different detector:
    * Original YOLOv2 Detector
    * MobileNet-type detector
-   * DenseNet-type detector
 
 -----------------------
 Example usage: This code will define pretrained YOLOv2 on COCO Dataset (80 classes)
@@ -27,7 +26,7 @@ class YOLOv2MetaArch(object):
                  num_classes):
         """
         YOLOv2 meta architecture, it consists of:
-            * Preprocessor      - a custom keras layer that pre-process inputs
+            * Preprocessor      - a custom Keras layer that pre-process inputs
             * Feature Extractor - a FeatureExtractor object
             * Detector          - a Detector Object
         :param feature_extractor:

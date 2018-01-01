@@ -16,19 +16,19 @@ def yolov2_loss(anchors, num_classes):
 
         gt_boxes   = y_true[..., 0:4]
         gt_conf    = y_true[..., 4:5]
-        gt_classes = y_true[..., 5]
+        # gt_classes = y_true[..., 5]
 
         # IOU scores shape [..., 5, 1]
         box_iou = iou(gt_boxes, pred_boxes)
         box_iou = tf.reduce_max(box_iou, axis=4)
-
-        # @TODO: focal loss
-        loc_loss  = compute_localization_loss(gt_boxes, pred_boxes)
-        conf_loss = tf.reduce_sum(tf.square(pred_conf - gt_conf * box_iou))
-        cls_loss  = compute_classification_loss(gt_classes, pred_classes)
-
-        total_loss = loc_loss + conf_loss + cls_loss
-        return total_loss
+        return box_iou
+        # # @TODO: focal loss
+        # loc_loss  = compute_localization_loss(gt_boxes, pred_boxes)
+        # conf_loss = tf.reduce_sum(tf.square(pred_conf - gt_conf * box_iou))
+        # cls_loss  = compute_classification_loss(gt_classes, pred_classes)
+        #
+        # total_loss = loc_loss + conf_loss + cls_loss
+        # return total_loss
 
     def compute_localization_loss(gt_boxes, pred_boxes):
         xy_loss = tf.square(pred_boxes[..., 0:2] - gt_boxes[..., 0:2])
