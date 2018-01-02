@@ -1,132 +1,100 @@
 import cv2
+import itertools
 import numpy as np
-
 import tensorflow as tf
 import keras.backend as K
+from ..core.ops import iou
 
 
-def input_func(images, labels, shuffle=True, batch_size=128):
-    def map_func(image, label):
-        img = cv2.imread(image)
-        height, width, _ = img.shape
-
-        output_width = cfg.IMG_INPUT_SIZE / cfg.SHRINK_FACTOR
-        output_height = cfg.IMG_INPUT_SIZE / cfg.SHRINK_FACTOR
-
-        x_train = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        y_train = np.zeros((output_height, output_width, cfg.N_ANCHORS, 5 + cfg.N_CLASSES))
-
-        for obj in label:
-            xc, yc, w, h, label_idx = obj  # convert label to int
-            one_hot_encoding = np.eye(cfg.N_CLASSES)[label_idx]
-
-            # convert to relative value
-            xc, yc, w, h = bbox.to_relative_size((float(width), float(height)))
-
-            # A cell in grid map
-            gt_label = np.concatenate([[xc, yc, w, h], [1.0], one_hot_encoding])
-            label.append(gt_label)
-            # @TODO: this can be done in loss function
-            center_x = xc * output_width
-            center_y = yc * output_height
-            r = int(np.floor(center_x))
-            c = int(np.floor(center_y))
-
-            # Construct Feature map ground truth
-            if r < output_width and c < output_height:
-                y_train[c, r, :, :] = cfg.N_ANCHORS * [gt_label]
-
-        return [tf.cast(x_train, tf.float32), tf.cast(y_train, tf.float32)]
-
-    dataset = tf.data.Dataset.from_tensor_slices((images, labels))
-    dataset = dataset.map(map_func)
-
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
-
-    dataset = dataset.repeat()
-    dataset = dataset.batch(batch_size)
-    iterator = dataset.make_one_shot_iterator()
-
-    # This is tensors
-    inputs, target = iterator.get_next()
-    return {'images': inputs}, target
+class TFData(object):
+    """A Data Generator Object using tf.data.Dataset
 
 
-class DataGenerator(Sequence):
     """
-    A Keras-way to properly handling multiprocessing dataset
-    https://github.com/keras-team/keras/blob/master/keras/utils/data_utils.py
-    """
-    def __init__(self, x, y, config, batch_size, augment=False):
+    def __init__(self, num_classes, anchors, shrink_factor=32):
         """
-        Constructor
-        :param x: - a list of image paths for training
-        :param y: - a dictionary containing ground truth objects, whereas:
-                    Key : an image path
-                    Values: a list of objects appearing in the image in format:
-                            [(x1, y1, x2, y2, encoded_idx_label), ....]
 
-        :param batch_size:
-        :param augment:
+        :param num_classes:   number of classes - for one-hot encoding
+        :param anchors:       RELATIVE anchors (in percentage)
+        :param shrink_factor: a factor determine how input is shrinked through
+                              feature extractor [default = 32]
         """
-        self.x = x
-        self.y = y
-        self.cfg                 = config
-        self.batch_size          = batch_size
-        self.enable_augmentation = augment
+        self.num_classes   = num_classes
+        self.anchors       = anchors
+        self.shrink_factor = shrink_factor
 
-    def __len__(self):
-        return math.ceil(len(self.x) / self.batch_size)
+    def generator(self, images, labels, img_size, batch_size=4, shuffle=True):
+        dataset    = self.create_tfdata(images, labels, img_size, batch_size, shuffle)
+        iterator   = dataset.make_one_shot_iterator()
+        next_batch = iterator.get_next()
+        while True:
+            yield K.get_session().run(next_batch)
 
-    def __getitem__(self, idx):
-        batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
-        batch_y = [self.y[key] for key in batch_x]
+    def create_tfdata(self, images, labels, img_size, batch_size=4, shuffle=True):
 
-        images, labels = self._generate_batch(batch_x, batch_y)
+        anchors   = self.anchors * img_size / self.shrink_factor
+        upper_pts = anchors - anchors / 2.0
+        lower_pts = anchors + anchors / 2.0
 
-        return np.asarray(images), labels
+        # for generating ground truth later
+        anchors_boxes = np.concatenate([upper_pts, lower_pts], axis=-1).astype(np.float32)[[1, 0, 3, 2]]
 
-    def _generate_batch(self, x, y):
-        # @TODO: freaking delete this
-
-        """
-        Format labels into proper form for computing loss
-
-        :param y: a list of labels : shape (batch_size, objs)
-                - each label is a list of objects in an image
-
-        :return:
-        """
-        images = []
-        labels = []
-
-        for filename, ground_truths in zip(x, y):
-            image = cv2.imread(filename)
+        def read_img_file(filename, label):
+            image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
             height, width, _ = image.shape
+            image = cv2.resize(image, (img_size, img_size))
 
-            label = []
+            # A label is consist of [y1, x1, y2, x2, class_idx]
+            label = np.reshape(label, (-1, 5))
 
-            for obj in ground_truths:
-                xc, yc, w, h, label_idx = obj  # convert label to int
-                one_hot_encoding = np.eye(self.cfg.N_CLASSES)[label_idx]
+            # Convert coordinates to relative values
+            boxes = label[..., 0:4] / np.array([height, width, height, width], np.float32)
 
-                # convert to relative value
-                xc, yc, w, h = bbox.to_relative_size((float(width), float(height)))
+            # Adjust boxes to correct ratio (due to distorted image)
+            # @TODO: box ratio
 
-                # A cell in grid map
-                gt_label  = np.concatenate([[xc, yc, w, h], [1.0], one_hot_encoding])
-                label.append(gt_label)
-                # @TODO: this can be done in loss function
-                # center_x = xc * grid_w
-                # center_y = yc * grid_h
-                # r = int(np.floor(center_x))
-                # c = int(np.floor(center_y))
-                #
-                # # Construct Feature map ground truth
-                # if r < grid_w and c < grid_h:
-                #     y_batch[i, c, r, :, :] = self.cfg.N_ANCHORS * [object_mask]
-            images.append(image)
-            labels.append(label)
+            label = np.concatenate([boxes, np.expand_dims(label[..., -1], 1)], axis=-1)
+            return image, label
 
-        return np.array(images), labels
+        def process_label(img, label):
+            boxes, classes = tf.split(label, [4, 1], 1)
+
+            # Generate feature map using tf.scatter_nd
+            # https://www.tensorflow.org/api_docs/python/tf/scatter_nd
+
+            # 1. Determine indices (where to put ground truths in the feature map)
+            # two ground truths may be in same cell, so we need to calculate the IoU
+            iou_scores   = iou(boxes, anchors_boxes)
+            cell_indices = tf.cast(tf.argmax(iou_scores, axis=1), tf.int32)
+            cell_indices = tf.expand_dims(cell_indices, axis=-1)
+
+            area     = boxes[..., 2:4] - boxes[..., 0:2]
+            centroid = boxes[..., 0:2] + (area / 2.0)
+            indices  = tf.cast(tf.floor(centroid * (img_size / self.shrink_factor)), tf.int32)
+            indices  = tf.concat([indices, cell_indices], axis=-1)
+
+            # 2. Construct output feature
+            objectness = tf.ones_like(classes)
+            one_hot    = tf.one_hot(tf.cast(tf.squeeze(classes, axis=1), tf.uint8), self.num_classes)
+            values     = tf.concat([boxes, objectness, one_hot], axis=1)
+
+            # 3. Create feature map
+            feature_map = tf.scatter_nd(indices, values, shape=[img_size / self.shrink_factor,
+                                                                img_size / self.shrink_factor,
+                                                                len(anchors),
+                                                                5 + self.num_classes])
+            return img, feature_map
+
+        dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),
+                                                 (tf.string, tf.float32),
+                                                 (tf.TensorShape([]), tf.TensorShape([None])))
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=100)
+        dataset = dataset.map(lambda filename, label:
+                              tuple(tf.py_func(read_img_file,
+                                               [filename, label],
+                                               [tf.uint8, label.dtype])))
+        dataset = dataset.map(process_label)
+        dataset = dataset.batch(batch_size)
+
+        return dataset

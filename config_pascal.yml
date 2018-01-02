@@ -1,0 +1,49 @@
+# Configuration file for YOLOv2 Darknet19 in COCO dataset
+
+####################
+# Common params    #
+####################
+anchors  : [[0.57273, 0.677385], [1.87446, 2.06253], [3.33843, 5.47434], [7.88282, 3.52778], [9.77052, 9.16828]]
+label_map: './dataset/coco/categories.txt'
+
+########################
+# Model configuration  #
+########################
+model:
+  name:          yolov2_darknet
+  image_size:    320
+  num_classes:   80
+  num_anchors:   5
+  shrink_factor: 32
+  weight_file:   yolo-coco.weights
+
+##########################
+# Train Hyper-parameters #
+##########################
+training_params:
+  epochs:          50
+  batch_size:      32
+  steps_per_epoch: 1000
+  learning_rate:   0.00001
+  backup_dir:      ./backup   # store best trained model and logs for tensorboard
+
+#########################
+# Deployment Parameters #
+#########################
+deploy_params:
+  output_path:      /tmp/     # it will generate a directory using model[name] (/tmp/yolov2_darknet)
+  version:          1         # a TF Serving may have multiple versions
+  maximum_boxes:    100
+  iou_threshold:    0.5
+  score_threshold:  0.0
+
+###########################
+# Interference Parameters #
+###########################
+interference:
+  server:          localhost:9000
+  frame_width:     480
+  frame_height:    640
+  frame_fps:       60
+  score_threshold: 0.7
+

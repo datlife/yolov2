@@ -27,20 +27,16 @@ python train.py \
 --learning_rate 0.001
 
 """
-import cv2
 import yaml
-import itertools
 import keras
 import numpy as np
-import tensorflow as tf
-import keras.backend as K
+from sklearn.model_selection import train_test_split
 
 from yolov2.zoo import yolov2_darknet19
 from yolov2.core.loss import yolov2_loss
-
+from yolov2.utils.generator import TFData
 from yolov2.utils.callbacks import create_callbacks
 from yolov2.utils.parser import parse_inputs, parse_label_map
-from sklearn.model_selection import train_test_split
 
 from argparse import ArgumentParser
 
@@ -61,32 +57,30 @@ def _main_():
     with open('config.yml', 'r') as stream:
         cfg = yaml.load(stream)
 
-    training_cfg = cfg['training_params']
     training_path = args.csv_file
 
     weight_file   = cfg['model']['weight_file']
     num_classes   = cfg['model']['num_classes']
     image_size    = cfg['model']['image_size']
-    epochs        = training_cfg['epochs']
-    batch_size    = training_cfg['batch_size']
-    learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
-    backup_dir    = training_cfg['backup_dir']
+    shrink_factor = cfg['model']['shrink_factor']
 
     # Config Anchors and encoding dict
-    anchors    = np.array(cfg['anchors'])
     label_dict = parse_label_map(cfg['label_map'])
+    anchors = np.array(cfg['anchors']) * (cfg['model']['image_size'] / 608.)
 
     # ###############
     # PREPARE DATA  #
     # ###############
     # @TODO: use TFRecords ?
-    # @TODO: Create K-fold cross validation training procedure
     inv_map = {v: k for k, v in label_dict.iteritems()}
     inputs, labels = parse_inputs(training_path, inv_map)
+
+    tfdata = TFData(num_classes, anchors, shrink_factor)
 
     # ###################
     # Define Keras Model
     # ###################
+    # @TODO: how to automatically load weights ?
     model = yolov2_darknet19(is_training= True,
                              img_size   = image_size,
                              anchors    = anchors,
@@ -99,6 +93,14 @@ def _main_():
     # ###################
     # COMPILE AND TRAIN #
     # ###################
+
+    # From config file
+    training_cfg  = cfg['training_params']
+    epochs        = training_cfg['epochs']
+    batch_size    = training_cfg['batch_size']
+    learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
+    backup_dir    = training_cfg['backup_dir']
+
     model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
                   loss     = yolov2_loss(anchors, num_classes))
 
@@ -111,56 +113,16 @@ def _main_():
         print("Number of training samples: {} || {}".format(len(x_train), len(y_train)))
         print("Number of validation samples: {} || {}".format(len(x_val), len(y_val)))
 
-        history = model.fit_generator(generator       = data_generator(x_train, y_train),
+        history = model.fit_generator(generator       = tfdata.generator(x_train, y_train, image_size, batch_size),
                                       steps_per_epoch = 1000,
-                                      validation_data = data_generator(x_val, y_val),
+                                      validation_data = tfdata.generator(x_val, y_val, image_size, batch_size),
                                       validation_steps= 100,
-                                      verbose=1,
-                                      workers=0)
+                                      verbose         = 1,
+                                      workers         = 0)
 
-        # Evaluate y_val and save summaries to tensorboard
+        # @TODO: Evaluate y_val and save summaries to TensorBoard
 
     model.save_weights('trained_model.h5')
-
-
-def data_generator(images, labels, shuffle=True, batch_size=4):
-    dataset = input_func(images, labels, shuffle, batch_size)
-    iterator = dataset.make_one_shot_iterator()
-    next_batch = iterator.get_next()
-    while True:
-        yield K.get_session().run(next_batch)
-
-
-def input_func(images, labels, shuffle=True, batch_size=8):
-    def read_img_file(filename, label):
-        image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
-        return image, label
-
-    def process_label(img, label):
-        height = tf.shape(img)[0]
-        width = tf.shape(img)[1]
-        label = tf.reshape(label, (-1, 5))
-        boxes, classes = tf.split(label, [4, 1], 1)
-        boxes = boxes / tf.cast([[height, width, height, width]], tf.float32)
-        boxes   = tf.expand_dims(boxes, 0)
-        img     = tf.expand_dims(img, 0)
-        classes = tf.squeeze(classes, axis=1)
-
-        return img, boxes, classes
-
-    # a hack to handle list with diffrent element size.
-    dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),
-                                             (tf.string, tf.float32),
-                                             (tf.TensorShape([]), tf.TensorShape([None])))
-    dataset = dataset.map(lambda filename, label:
-                          tuple(tf.py_func(read_img_file,
-                                           [filename, label],
-                                           [tf.uint8, label.dtype])))
-    dataset = dataset.map(process_label)
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=300)
-
-    return dataset
 
 
 if __name__ == "__main__":

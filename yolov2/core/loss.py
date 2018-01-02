@@ -11,23 +11,27 @@ def yolov2_loss(anchors, num_classes):
     def compute_loss(y_true, y_pred):
 
         pred_boxes   = y_pred[..., 0:4]
-        pred_conf    = y_pred[..., 4:5]
+        pred_conf    = y_pred[..., 4]
         pred_classes = y_pred[..., 5:]
 
         gt_boxes   = y_true[..., 0:4]
-        gt_conf    = y_true[..., 4:5]
-        # gt_classes = y_true[..., 5]
+        gt_conf    = y_true[..., 4]
+        gt_classes = y_true[..., 5:]
 
         # IOU scores shape [..., 5, 1]
-        box_iou = iou(gt_boxes, pred_boxes)
-        box_iou = tf.reduce_max(box_iou, axis=4)
-        return box_iou
+        box_iou = compute_iou(gt_boxes, pred_boxes)
+        box_iou = tf.reduce_max(box_iou, axis=-1)
+
+        true_conf = gt_conf * box_iou
+
+        return true_conf
         # # @TODO: focal loss
         # loc_loss  = compute_localization_loss(gt_boxes, pred_boxes)
         # conf_loss = tf.reduce_sum(tf.square(pred_conf - gt_conf * box_iou))
         # cls_loss  = compute_classification_loss(gt_classes, pred_classes)
         #
         # total_loss = loc_loss + conf_loss + cls_loss
+        # return total_loss
         # return total_loss
 
     def compute_localization_loss(gt_boxes, pred_boxes):
@@ -47,69 +51,27 @@ def yolov2_loss(anchors, num_classes):
     return compute_loss
 
 
-def iou(boxes_list1, boxes_list2, scope=None):
-    """
-      Args:
-        boxes_list1: Tensor holding N boxes
-        boxes_list2: Tensor holding M boxes
-        scope
+def compute_iou(gt_boxes, pred_boxes, scope=None):
+    with tf.name_scope(scope, 'IoU'):
+        with tf.name_scope('area'):
+            gt_wh   = gt_boxes[..., 2:4]   - gt_boxes[..., 0:2]
+            pr_wh   = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
 
-      Returns:
-        a tensor with shape [N, M] representing pairwise iou scores.
-      """
-    with tf.name_scope(scope, 'IOU'):
-        areas1        = area(boxes_list1)
-        areas2        = area(boxes_list2)
-        intersections = intersection(boxes_list1, boxes_list2)
+            gt_area = gt_wh[..., 0] * gt_wh[..., 1]
+            pr_area = pr_wh[..., 0] * pr_wh[..., 1]
 
-        unions = (tf.expand_dims(areas1, 1) +
-                  tf.expand_dims(areas2, 0) - intersections)
+        with tf.name_scope('intersections'):
+            intersect_mins  = tf.maximum(gt_boxes[..., 0:2], pred_boxes[..., 0:2])
+            intersect_maxes = tf.minimum(gt_boxes[..., 2:4], pred_boxes[..., 2:4])
+            intersect_hw    = tf.maximum(intersect_maxes - intersect_mins, 0.)
+            intersections   = intersect_hw[..., 0] * intersect_hw[..., 1]
 
-    return tf.where(tf.equal(intersections, 0.0),
-                    tf.zeros_like(intersections),
-                    tf.truediv(intersections, unions))
+        unions = gt_area + pr_area - intersections
+        iou = tf.where(tf.equal(intersections, 0.0),
+                       tf.zeros_like(intersections),
+                       tf.truediv(intersections, unions))
 
-
-def area(boxes, scope=None):
-    """Computes area of boxes.
-
-    Args:
-      boxes: Tensor holding N boxes
-      scope: name scope.
-
-    Returns:
-      a tensor with shape [N] representing box areas.
-    """
-    with tf.name_scope(scope, 'Area'):
-        y_min, x_min, y_max, x_max = tf.split(value=boxes, num_or_size_splits=4, axis=-1)
-        return tf.squeeze((y_max - y_min) * (x_max - x_min), [1])
-
-
-def intersection(boxes_list1, boxes_list2, scope=None):
-    """Compute pairwise intersection areas between boxes.
-
-    Args:
-    boxlist1: Tensor holding N boxes
-    boxlist2: Tensor holding M boxes
-    scope: name scope.
-
-    Returns:
-    a tensor with shape [N, M] representing pairwise intersections
-    """
-    with tf.name_scope(scope, 'Intersection'):
-        y_min1, x_min1, y_max1, x_max1 = tf.split(value=boxes_list1, num_or_size_splits=4, axis=-1)
-        y_min2, x_min2, y_max2, x_max2 = tf.split(value=boxes_list2, num_or_size_splits=4, axis=-1)
-
-        all_pairs_min_ymax = tf.minimum(y_max1, tf.transpose(y_max2))
-        all_pairs_max_ymin = tf.maximum(y_min1, tf.transpose(y_min2))
-
-        intersect_heights = tf.maximum(0.0, all_pairs_min_ymax - all_pairs_max_ymin)
-        all_pairs_min_xmax = tf.minimum(x_max1, tf.transpose(x_max2))
-        all_pairs_max_xmin = tf.maximum(x_min1, tf.transpose(x_min2))
-
-        intersect_widths = tf.maximum(0.0, all_pairs_min_xmax - all_pairs_max_xmin)
-
-    return intersect_heights * intersect_widths
+        return iou
 
 # mask_shape = tf.shape(y_true)[:4]
 #
