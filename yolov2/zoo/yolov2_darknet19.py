@@ -16,7 +16,7 @@ from yolov2.core.detectors.yolov2 import yolov2_detector
 from yolov2.core.custom_layers import ImageResizer
 
 
-def yolov2_darknet19(img_size,
+def yolov2_darknet19(resized_inputs,
                      is_training,
                      anchors,
                      num_classes,
@@ -25,7 +25,6 @@ def yolov2_darknet19(img_size,
                      max_boxes = 100):
     """Definition of YOLOv2 using DarkNet19 as feature extractor
 
-    :param img_size:    - an int - default image size that let ImageResizer to know how to resize the image
     :param is_training: - a boolean
     :param anchors:     - a float numpy array - list of anchors
     :param num_classes: - an int - number of classes in the dataset
@@ -34,8 +33,6 @@ def yolov2_darknet19(img_size,
     :param max_boxes    - an int - maximum of boxes used in Post Process (non-max-suppression)
     :return: the outputs of model
     """
-    inputs = Input(shape=(None, None, 3), name='image_input')
-
     # Construct Keras model, this function return a build blocks
     # of YOLOv2 model
     yolov2 = YOLOv2MetaArch(feature_extractor= darknet19,
@@ -43,12 +40,11 @@ def yolov2_darknet19(img_size,
                             anchors          = anchors,
                             num_classes      = num_classes)
 
-    resized_inputs = ImageResizer(img_size, name="ImageResizer")(inputs)
     outputs = yolov2.predict(resized_inputs)
 
     if is_training:
-        return Model(inputs=inputs, outputs=outputs)
+        return Model(inputs=resized_inputs, outputs=outputs)
     else:
         outputs = yolov2.post_process(outputs, iou, scores_threshold, max_boxes)
-        return Model(inputs=inputs, outputs=outputs)
+        return Model(inputs=resized_inputs, outputs=outputs)
 

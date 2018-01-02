@@ -44,21 +44,29 @@ def _main_():
     # Define Keras Model
     # ###################
     model_cfg  = config['model']
-    model = yolov2_darknet19(is_training      = False,
-                             img_size         = model_cfg['image_size'],
-                             anchors          = anchors,
-                             num_classes      = model_cfg['num_classes'],
-                             iou              = args.iou,
-                             scores_threshold = args.threshold,
-                             max_boxes        = 100)
+    from keras.layers import Input
+    from keras.models import Model
+    inputs = Input(shape=(None, None, 3))
+    model = yolov2_darknet19(inputs,
+                             is_training=True,
+                             anchors=anchors,
+                             num_classes=model_cfg['num_classes'],
+                             iou=args.iou,
+                             scores_threshold=args.threshold,
+                             max_boxes=100)
 
     model.load_weights(args.weights)
+
     model.summary()
+
+    coco_base_model = Model(inputs, model.layers[-3].output)
+    coco_base_model.save_weights('base_coco_yolov2.weights')
 
     # #####################
     # Make one prediction #
     # #####################
     image = cv2.imread(args.path)
+    image = cv2.resize(image, (320, 320))
 
     bboxes, scores, classes = model.predict_on_batch(np.expand_dims(image, axis=0))
 
