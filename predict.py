@@ -45,7 +45,7 @@ def _main_():
     # ###################
     model_cfg  = config['model']
     from keras.layers import Input
-    from keras.models import Model
+
     inputs = Input(shape=(None, None, 3))
     model = yolov2_darknet19(inputs,
                              is_training=True,
@@ -56,11 +56,8 @@ def _main_():
                              max_boxes=100)
 
     model.load_weights(args.weights)
-
     model.summary()
 
-    coco_base_model = Model(inputs, model.layers[-3].output)
-    coco_base_model.save_weights('base_coco_yolov2.weights')
 
     # #####################
     # Make one prediction #

@@ -9,44 +9,61 @@ import keras.backend as K
 def yolov2_loss(anchors, num_classes):
 
     def compute_loss(y_true, y_pred):
+        output_dims = tf.shape(y_pred)
+        height = output_dims[1]
+        width = output_dims[2]
 
-        pred_boxes   = y_pred[..., 0:4]
-        pred_conf    = y_pred[..., 4]
+        pred_boxes = y_pred[..., 0:4]
+        pred_conf = y_pred[..., 4]
         pred_classes = y_pred[..., 5:]
 
-        gt_boxes   = y_true[..., 0:4]
-        gt_conf    = y_true[..., 4]
+        gt_boxes = y_true[..., 0:4]
+        gt_conf = y_true[..., 4]
         gt_classes = y_true[..., 5:]
 
-        # IOU scores shape [..., 5, 1]
-        box_iou = compute_iou(gt_boxes, pred_boxes)
-        box_iou = tf.reduce_max(box_iou, axis=-1)
+        obj_cells = tf.expand_dims(y_true[..., 4], -1)
+        noobj_cells = tf.expand_dims(1.0 - y_true[..., 4], -1)
 
-        true_conf = gt_conf * box_iou
+        #  Create offset map
+        cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
+        cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
+        cy = tf.reshape(cy, [-1, height, width, 1])
+        c_xy = tf.to_float(tf.stack([cx, cy], -1))
 
-        return true_conf
+        with tf.name_scope('RegressionLoss'):
+            # Convert [y1, x1, y2, x2] to [y_c, x_c, h, w] coordinates
+            gt_wh = gt_boxes[..., 2:4] - gt_boxes[..., 0:2]
+            pred_wh = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
+            gt_centroids = gt_boxes[..., 0:2] + gt_wh
+            pred_centroids = pred_boxes[..., 0:2] + pred_wh
+
+            grid_centroids = c_xy + 0.5
+            grid_wh = tf.cast(tf.reshape(anchors, [1, 1, 1, len(anchors), 2]), tf.float32)
+
+            obj_coord   = obj_cells   * (tf.square(pred_centroids - gt_centroids) +
+                                         tf.square(tf.sqrt(pred_wh) - tf.sqrt(gt_wh)))
+
+            noobj_coord = noobj_cells * (tf.square(pred_centroids - grid_centroids) +
+                                         tf.square(tf.sqrt(pred_wh) - tf.sqrt(tf.ones_like(pred_wh) * grid_wh)))
+
+            coord_loss = 1.0 * obj_coord + 0.01 * noobj_coord
+
+        with tf.name_scope('ObjectConfidenceLoss'):
+            box_iou = compute_iou(gt_boxes, pred_boxes)
+            best_iou = tf.expand_dims(tf.reduce_max(box_iou, axis=-1), -1)
+
+            obj_conf   = obj_cells   * tf.expand_dims(tf.square(pred_conf - gt_conf * box_iou), -1)
+            noobj_conf = noobj_cells * tf.expand_dims(tf.square(pred_conf - 0.0) * tf.to_float(best_iou < 0.6), -1)
+
+            conf_loss = 5.0 * obj_conf + 0.01 * noobj_conf
+
         # # @TODO: focal loss
-        # loc_loss  = compute_localization_loss(gt_boxes, pred_boxes)
-        # conf_loss = tf.reduce_sum(tf.square(pred_conf - gt_conf * box_iou))
-        # cls_loss  = compute_classification_loss(gt_classes, pred_classes)
-        #
-        # total_loss = loc_loss + conf_loss + cls_loss
-        # return total_loss
-        # return total_loss
+        with tf.name_scope("ClassificationLoss"):
+            cls_loss = tf.nn.softmax_cross_entropy_with_logits(labels=gt_classes, logits=pred_classes)
+            cls_loss = obj_cells * tf.expand_dims(cls_loss, -1)
 
-    def compute_localization_loss(gt_boxes, pred_boxes):
-        xy_loss = tf.square(pred_boxes[..., 0:2] - gt_boxes[..., 0:2])
-        xy_loss = tf.reduce_sum(xy_loss)
-
-        wh_loss = tf.square(tf.sqrt(pred_boxes[..., 0:2]) - tf.sqrt(gt_boxes[..., 0:2]))
-        wh_loss = tf.reduce_sum(wh_loss)
-
-        return xy_loss + wh_loss
-
-    def compute_classification_loss(gt_classes, pred_classes):
-        cls_loss = tf.nn.softmax_cross_entropy_with_logits(labels=gt_classes, logits=pred_classes)
-        cls_loss = tf.reduce_sum(cls_loss)
-        return cls_loss
+        total_loss = tf.reduce_sum(coord_loss) + tf.reduce_sum(conf_loss) + tf.reduce_sum(cls_loss)
+        return total_loss
 
     return compute_loss
 
@@ -54,17 +71,17 @@ def yolov2_loss(anchors, num_classes):
 def compute_iou(gt_boxes, pred_boxes, scope=None):
     with tf.name_scope(scope, 'IoU'):
         with tf.name_scope('area'):
-            gt_wh   = gt_boxes[..., 2:4]   - gt_boxes[..., 0:2]
-            pr_wh   = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
+            gt_wh = gt_boxes[..., 2:4] - gt_boxes[..., 0:2]
+            pr_wh = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
 
             gt_area = gt_wh[..., 0] * gt_wh[..., 1]
             pr_area = pr_wh[..., 0] * pr_wh[..., 1]
 
         with tf.name_scope('intersections'):
-            intersect_mins  = tf.maximum(gt_boxes[..., 0:2], pred_boxes[..., 0:2])
+            intersect_mins = tf.maximum(gt_boxes[..., 0:2], pred_boxes[..., 0:2])
             intersect_maxes = tf.minimum(gt_boxes[..., 2:4], pred_boxes[..., 2:4])
-            intersect_hw    = tf.maximum(intersect_maxes - intersect_mins, 0.)
-            intersections   = intersect_hw[..., 0] * intersect_hw[..., 1]
+            intersect_hw = tf.maximum(intersect_maxes - intersect_mins, 0.)
+            intersections = intersect_hw[..., 0] * intersect_hw[..., 1]
 
         unions = gt_area + pr_area - intersections
         iou = tf.where(tf.equal(intersections, 0.0),
@@ -184,170 +201,3 @@ def compute_iou(gt_boxes, pred_boxes, scope=None):
 #
 # loss = loss_xy + loss_wh + loss_conf + loss_class
 ##
-# return loss
-# #
-# def iou(boxeslist1, boxeslist2, scope=None):
-#     """
-#       Args:
-#         boxeslist1: BoxList holding N boxes
-#         boxeslist2: BoxList holding M boxes
-#         scope
-#
-#       Returns:
-#         a tensor with shape [N, M] representing pairwise iou scores.
-#       """
-#     with tf.name_scope(scope, 'IOU'):
-#         intersections = intersection(boxeslist1, boxeslist2)
-#         areas1 = area(boxeslist1)
-#         areas2 = area(boxeslist2)
-#
-#         unions = (tf.expand_dims(areas1, 1) +
-#                   tf.expand_dims(areas2, 0) - intersections)
-#
-#     return tf.where(tf.equal(intersections, 0.0),
-#                     tf.zeros_like(intersections),
-#                     tf.truediv(intersections, unions))
-# #
-#
-# def area(boxes, scope=None):
-#     """Computes area of boxes.
-#
-#     Args:
-#       boxes: BoxList holding N boxes
-#       scope: name scope.
-#
-#     Returns:
-#       a tensor with shape [N] representing box areas.
-#     """
-#     with tf.name_scope(scope, 'Area'):
-#         y_min, x_min, y_max, x_max = tf.split(value=boxes.get(), num_or_size_splits=4, axis=1)
-#
-#         return tf.squeeze((y_max - y_min) * (x_max - x_min), [1])
-#
-#
-# def intersection(boxlist1, boxlist2, scope=None):
-#     """Compute pairwise intersection areas between boxes.
-#
-#     Args:
-#     boxlist1: BoxList holding N boxes
-#     boxlist2: BoxList holding M boxes
-#     scope: name scope.
-#
-#     Returns:
-#     a tensor with shape [N, M] representing pairwise intersections
-#     """
-#     with tf.name_scope(scope, 'Intersection'):
-#         y_min1, x_min1, y_max1, x_max1 = tf.split(value=boxlist1.get(), num_or_size_splits=4, axis=1)
-#         y_min2, x_min2, y_max2, x_max2 = tf.split(value=boxlist2.get(), num_or_size_splits=4, axis=1)
-#
-#         all_pairs_min_ymax = tf.minimum(y_max1, tf.transpose(y_max2))
-#         all_pairs_max_ymin = tf.maximum(y_min1, tf.transpose(y_min2))
-#
-#         intersect_heights = tf.maximum(0.0, all_pairs_min_ymax - all_pairs_max_ymin)
-#         all_pairs_min_xmax = tf.minimum(x_max1, tf.transpose(x_max2))
-#         all_pairs_max_xmin = tf.maximum(x_min1, tf.transpose(x_min2))
-#
-#         intersect_widths = tf.maximum(0.0, all_pairs_min_xmax - all_pairs_max_xmin)
-#
-#     return intersect_heights * intersect_widths
-
-# def loss_func(y_true, y_pred):
-#     """c
-#     YOLOv2 Loss Function Implementation
-#     Output:
-#        A scalar - loss value for back propagation
-#     """
-#     N_ANCHORS = len(self.anchors)
-#     N_CLASSES = self.num_classes
-#
-#     pred_shape = K.shape(y_pred)[1:3]
-#     GRID_H     = tf.cast(pred_shape[0], tf.int32)  # shape of output feature map
-#     GRID_W     = tf.cast(pred_shape[1], tf.int32)
-#
-#     y_pred = tf.reshape(y_pred, [-1, pred_shape[0], pred_shape[1], N_ANCHORS, N_CLASSES + 5])
-#
-#     # Create off set map
-#     cx = tf.cast((K.arange(0, stop=GRID_W)), dtype=tf.float32)
-#     cx = K.tile(cx, [GRID_H])
-#     cx = K.reshape(cx, [-1, GRID_H, GRID_W, 1])
-#
-#     cy = K.cast((K.arange(0, stop=GRID_H)), dtype=tf.float32)
-#     cy = K.reshape(cy, [-1, 1])
-#     cy = K.tile(cy, [1, GRID_W])
-#     cy = K.reshape(cy, [-1])
-#     cy = K.reshape(cy, [-1, GRID_H, GRID_W, 1])
-#
-#     c_xy = tf.stack([cx, cy], -1)
-#     c_xy = tf.to_float(c_xy)
-#
-#     # Scale absolute predictions to relative values by dividing by output_size
-#     output_size    = tf.cast(tf.reshape([GRID_W, GRID_H], [1, 1, 1, 1, 2]), tf.float32)
-#     anchors_tensor = np.reshape(self.anchors, [1, 1, 1, N_ANCHORS, 2])
-#
-#     pred_box_xy   = (tf.sigmoid(y_pred[:, :, :, :, :2]) + c_xy) / output_size
-#     pred_box_wh   = tf.exp(y_pred[:, :, :, :, 2:4]) * anchors_tensor / output_size
-#     pred_box_wh   = tf.sqrt(pred_box_wh)
-#     pred_box_conf = tf.sigmoid(y_pred[:, :, :, :, 4:5])
-#     pred_box_prob = tf.nn.softmax(y_pred[:, :, :, :, 5:])
-#
-#     # adjust confidence
-#     pred_tem_wh   = tf.pow(pred_box_wh, 2) * output_size
-#     pred_box_ul   = pred_box_xy - 0.5 * pred_tem_wh
-#     pred_box_bd   = pred_box_xy + 0.5 * pred_tem_wh
-#     pred_box_area = pred_tem_wh[:, :, :, :, 0] * pred_tem_wh[:, :, :, :, 1]
-#
-#     # Adjust ground truth
-#     gt_shape = K.shape(y_true)  # shape of ground truth value
-#     y_true = tf.reshape(y_true, [-1, gt_shape[1], gt_shape[2], N_ANCHORS, N_CLASSES + 5])
-#
-#     true_box_xy = y_true[:, :, :, :, 0:2]
-#     true_box_wh = tf.sqrt(y_true[:, :, :, :, 2:4])
-#
-#     true_tem_wh   = tf.pow(true_box_wh, 2) * output_size
-#     true_box_ul   = true_box_xy - 0.5 * true_tem_wh
-#     true_box_bd   = true_box_xy + 0.5 * true_tem_wh
-#     true_box_area = true_tem_wh[:, :, :, :, 0] * true_tem_wh[:, :, :, :, 1]
-#
-#     intersect_ul   = tf.maximum(pred_box_ul, true_box_ul)
-#     intersect_br   = tf.minimum(pred_box_bd, true_box_bd)
-#     intersect_wh   = tf.maximum(intersect_br - intersect_ul, 0.0)
-#     intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
-#
-#     # This is confusing!! :(
-#
-#     # intersection over union
-#     iou = tf.truediv(intersect_area,
-#                      true_box_area + pred_box_area - intersect_area)
-#
-#     # For each cell, find the anchor has the highest IoU and set to True
-#     best_box = tf.equal(iou, tf.reduce_max(iou, [3], True))
-#     best_box = tf.to_float(best_box)
-#     # Filter out other anchors in a given cell to zero. We only consider,
-#     # highest IoU to compute the boxes
-#     true_box_conf = tf.expand_dims(best_box * y_true[:, :, :, :, 4], -1)
-#     true_box_prob = y_true[:, :, :, :, 5:]
-#
-#     # Localization Loss
-#     weight_coor = 5.0 * tf.concat(4 * [true_box_conf], 4)
-#     true_boxes  = tf.concat([true_box_xy, true_box_wh], 4)
-#     pred_boxes  = tf.concat([pred_box_xy, pred_box_wh], 4)
-#     loc_loss    = tf.pow(true_boxes - pred_boxes, 2) * weight_coor
-#     loc_loss    = tf.reshape(loc_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * 4])
-#     loc_loss    = tf.reduce_mean(tf.reduce_sum(loc_loss, 1))
-#
-#     # NOTE: YOLOv2 does not use cross-entropy loss.
-#     # Object Confidence Loss
-#     weight_conf   = 0.5 * (1. - true_box_conf) + 5.0 * true_box_conf
-#     obj_conf_loss = tf.pow(true_box_conf - pred_box_conf, 2) * weight_conf
-#     obj_conf_loss = tf.reshape(obj_conf_loss, [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS])
-#     obj_conf_loss = tf.reduce_mean(tf.reduce_sum(obj_conf_loss, 1))
-#
-#     # Classification Loss
-#     weight_prob         = 1.0 * tf.concat(N_CLASSES * [true_box_conf], 4)
-#     classification_loss = tf.pow(true_box_prob - pred_box_prob, 2) * weight_prob
-#     classification_loss = tf.reshape(classification_loss,
-#                                      [-1, tf.cast(GRID_W * GRID_H, tf.int32) * N_ANCHORS * N_CLASSES])
-#     classification_loss = tf.reduce_mean(tf.reduce_sum(classification_loss, 1))
-#
-#     loss = 0.5 * (loc_loss + obj_conf_loss + classification_loss)
-#     return loss
