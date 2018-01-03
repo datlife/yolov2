@@ -15,6 +15,7 @@ import keras.backend as K
 
 from keras.layers import Conv2D
 from keras.layers import Lambda
+from keras.regularizers import l2
 from .custom_layers import PostProcessor
 
 
@@ -48,7 +49,7 @@ class YOLOv2MetaArch(object):
 
             with tf.name_scope("Detector"):
                 x       = self.detector(feature_map, pass_through_layers)
-                x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
+                x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1), kernel_regularizer=l2(5e-4),
                                  name='output_features')(x)
 
                 predictions = Lambda(lambda x: self.interpret_yolov2(x),

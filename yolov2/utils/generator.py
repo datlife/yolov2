@@ -9,7 +9,6 @@ from ..core.ops import iou
 class TFData(object):
     """A Data Generator Object using tf.data.Dataset
 
-
     """
     def __init__(self, num_classes, anchors, shrink_factor=32):
         """
@@ -19,25 +18,22 @@ class TFData(object):
         :param shrink_factor: a factor determine how input is shrinked through
                               feature extractor [default = 32]
         """
-        self.num_classes   = num_classes
-        self.anchors       = anchors
+        self.num_classes = num_classes
+        self.anchors = anchors
         self.shrink_factor = shrink_factor
 
-    def generator(self, images, labels, img_size, batch_size=4, shuffle=True):
-        dataset    = self.create_tfdata(images, labels, img_size, batch_size, shuffle)
-        iterator   = dataset.make_one_shot_iterator()
+    def generator(self, images, labels, img_size, shuffle=True, batch_size=4):
+        dataset = self.create_tfdata(images, labels, img_size, shuffle, batch_size)
+        iterator = dataset.make_one_shot_iterator()
         next_batch = iterator.get_next()
         while True:
             yield K.get_session().run(next_batch)
 
-    def create_tfdata(self, images, labels, img_size, batch_size=4, shuffle=True):
-
-        anchors   = self.anchors * img_size / self.shrink_factor
-        upper_pts = anchors - anchors / 2.0
-        lower_pts = anchors + anchors / 2.0
-
+    def create_tfdata(self, images, labels, img_size, shuffle=True, batch_size=4):
         # for generating ground truth later
-        anchors_boxes = np.concatenate([upper_pts, lower_pts], axis=-1).astype(np.float32)[[1, 0, 3, 2]]
+        # swapping width and height
+
+        anchors = np.array(self.anchors).astype(np.float32)[:, [1, 0]]
 
         def read_img_file(filename, label):
             image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
@@ -63,26 +59,39 @@ class TFData(object):
             # https://www.tensorflow.org/api_docs/python/tf/scatter_nd
 
             # 1. Determine indices (where to put ground truths in the feature map)
-            # two ground truths may be in same cell, so we need to calculate the IoU
-            iou_scores   = iou(boxes, anchors_boxes)
-            cell_indices = tf.cast(tf.argmax(iou_scores, axis=1), tf.int32)
-            cell_indices = tf.expand_dims(cell_indices, axis=-1)
+            # two ground truths may be in same cell, so we need to calculate the IoU (z_index)
 
-            area     = boxes[..., 2:4] - boxes[..., 0:2]
-            centroid = boxes[..., 0:2] + (area / 2.0)
-            indices  = tf.cast(tf.floor(centroid * (img_size / self.shrink_factor)), tf.int32)
-            indices  = tf.concat([indices, cell_indices], axis=-1)
+            area             = boxes[..., 2:4] - boxes[..., 0:2]
+            centroids        = boxes[..., 0:2] + (area / 2.0)
+            anchor_centroids = tf.tile(centroids, (1, len(anchors)))
+            anchor_centroids = tf.reshape(anchor_centroids, shape=[tf.shape(centroids)[0], len(anchors), -1])
 
+            upper_pts = anchor_centroids - (anchors / 2.0)
+            lower_pts = anchor_centroids + (anchors / 2.0)
+            anchor_boxes = tf.cast(tf.concat([upper_pts, lower_pts], axis=-1), tf.float32)
+
+            iou_scores = tf.map_fn(lambda x: iou(tf.expand_dims(x[0], 0), x[1]),
+                                   elems=(boxes, anchor_boxes), dtype=tf.float32)
+            iou_scores = tf.squeeze(iou_scores, 1)
+
+            z_indices = tf.cast(tf.argmax(iou_scores, axis=1), tf.int32)
+            z_indices = tf.expand_dims(z_indices, axis=-1)
+            xy_indices = tf.cast(tf.floor(centroids * (img_size / self.shrink_factor)), tf.int32)
+
+            indices = tf.concat([xy_indices, z_indices], axis=-1)
+
+            # https://www.tensorflow.org/api_docs/python/tf/scatter_nd
             # 2. Construct output feature
             objectness = tf.ones_like(classes)
-            one_hot    = tf.one_hot(tf.cast(tf.squeeze(classes, axis=1), tf.uint8), self.num_classes)
-            values     = tf.concat([boxes, objectness, one_hot], axis=1)
+            one_hot = tf.one_hot(tf.cast(tf.squeeze(classes, axis=1), tf.uint8), self.num_classes)
+            values = tf.concat([boxes, objectness, one_hot], axis=1)
 
             # 3. Create feature map
             feature_map = tf.scatter_nd(indices, values, shape=[img_size / self.shrink_factor,
                                                                 img_size / self.shrink_factor,
                                                                 len(anchors),
                                                                 5 + self.num_classes])
+
             return img, feature_map
 
         dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),
@@ -90,6 +99,7 @@ class TFData(object):
                                                  (tf.TensorShape([]), tf.TensorShape([None])))
         if shuffle:
             dataset = dataset.shuffle(buffer_size=100)
+
         dataset = dataset.map(lambda filename, label:
                               tuple(tf.py_func(read_img_file,
                                                [filename, label],
@@ -98,3 +108,4 @@ class TFData(object):
         dataset = dataset.batch(batch_size)
 
         return dataset
+

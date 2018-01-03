@@ -78,7 +78,12 @@ def conv_block(x, filters, kernel_size, name=None):
         Standard YOLOv2 Convolutional Block as suggested in YOLO9000 paper
     """
     with tf.name_scope('ConvBlock'):
-        x = Conv2D(filters=filters, kernel_size=kernel_size, padding='same', use_bias=False, name=name)(x)
+        x = Conv2D(filters=filters,
+                   kernel_size=kernel_size,
+                   padding='same',
+                   use_bias=False,
+                   kernel_regularizer=l2(5e-4),
+                   name=name)(x)
         x = BatchNormalization(name=name if name is None else 'batch_norm_%s' % name)(x)
         x = LeakyReLU(alpha=0.1, name=name if name is None else 'leaky_relu_%s' % name)(x)
         return x
