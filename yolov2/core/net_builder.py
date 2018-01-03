@@ -49,7 +49,7 @@ class YOLOv2MetaArch(object):
 
             with tf.name_scope("Detector"):
                 x       = self.detector(feature_map, pass_through_layers)
-                x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1), kernel_regularizer=l2(5e-4),
+                x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
                                  name='output_features')(x)
 
                 predictions = Lambda(lambda x: self.interpret_yolov2(x),
