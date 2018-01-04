@@ -1,6 +1,40 @@
 import tensorflow as tf
 
 
+def find_and_solve_collided_indices(indices, values, shape):
+    """Sometimes ground truth indices will be collided,
+
+    shape: - a TensorShape
+    We attempted to solved it by :
+       * Find all a set of collided indices
+       * For each set, update to the next possible index (based on iou_score)
+       * If not possible, remove ground truths :(
+    """
+    width  = shape[0].value
+    height = shape[1].value
+    depth  = shape[2].value
+
+    #  iou_scores = tf.cast(iou_scores, tf.float64)
+
+    def reverse(index):
+        # @TODO: linearize N-d dimension
+        x = index / (height * depth)
+        y = (index - x * height * depth) / depth
+        z = index - x * height * depth - y * depth
+        return tf.stack([x, y, z], -1)
+
+    # Given a matrix N-d dimension[N_k, ...N_1, N_0], linearizing by multiply [..., N_1 * N_0, N_0, 1]
+    flatten = tf.matmul(tf.cast(indices, tf.int32), [[height * depth], [depth], [1]])
+    filtered_idx, idx = tf.unique(tf.squeeze(flatten))
+
+    # @TODO: filter based on IOU
+    # Convert filtered_idx to original dims
+    updated_indices = tf.cast(tf.map_fn(fn=lambda i: reverse(i), elems=filtered_idx), tf.int64)
+    updated_values  = tf.unsorted_segment_max(values, idx, num_segments=tf.shape(filtered_idx)[0])
+
+    return [updated_indices, updated_values]
+
+
 def iou(boxes_list1, boxes_list2, scope=None):
     """
       Args:

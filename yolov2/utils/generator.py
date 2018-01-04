@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import keras.backend as K
 from ..core.ops import iou
+from ..core.ops import find_and_solve_collided_indices
 
 
 class TFData(object):
@@ -56,13 +57,9 @@ class TFData(object):
             boxes, classes = tf.split(label, [4, 1], 1)
 
             # Generate feature map using tf.scatter_nd
-            # https://www.tensorflow.org/api_docs/python/tf/scatter_nd
+            area = boxes[..., 2:4] - boxes[..., 0:2]
+            centroids = boxes[..., 0:2] + (area / 2.0)
 
-            # 1. Determine indices (where to put ground truths in the feature map)
-            # two ground truths may be in same cell, so we need to calculate the IoU (z_index)
-
-            area             = boxes[..., 2:4] - boxes[..., 0:2]
-            centroids        = boxes[..., 0:2] + (area / 2.0)
             anchor_centroids = tf.tile(centroids, (1, len(anchors)))
             anchor_centroids = tf.reshape(anchor_centroids, shape=[tf.shape(centroids)[0], len(anchors), -1])
 
@@ -72,25 +69,32 @@ class TFData(object):
 
             iou_scores = tf.map_fn(lambda x: iou(tf.expand_dims(x[0], 0), x[1]),
                                    elems=(boxes, anchor_boxes), dtype=tf.float32)
-            iou_scores = tf.squeeze(iou_scores, 1)
 
-            z_indices = tf.cast(tf.argmax(iou_scores, axis=1), tf.int32)
+            z_indices = tf.cast(tf.argmax(tf.squeeze(iou_scores, 1), axis=1), tf.int64)
             z_indices = tf.expand_dims(z_indices, axis=-1)
-            xy_indices = tf.cast(tf.floor(centroids * (img_size / self.shrink_factor)), tf.int32)
+            xy_indices = tf.cast(tf.floor(centroids * (img_size / self.shrink_factor)), tf.int64)
 
+            # @TODO: solve collided indices, bboxes will be accumulated
             indices = tf.concat([xy_indices, z_indices], axis=-1)
 
-            # https://www.tensorflow.org/api_docs/python/tf/scatter_nd
             # 2. Construct output feature
             objectness = tf.ones_like(classes)
             one_hot = tf.one_hot(tf.cast(tf.squeeze(classes, axis=1), tf.uint8), self.num_classes)
             values = tf.concat([boxes, objectness, one_hot], axis=1)
 
+            output_shape = tf.TensorShape([img_size / self.shrink_factor,
+                                           img_size / self.shrink_factor,
+                                           len(anchors),
+                                           5 + self.num_classes])
+            # Filter out duplicated indices
+            indices, values = tf.cond(pred=tf.greater(tf.shape(indices)[0], 1),
+                                      true_fn=lambda: find_and_solve_collided_indices(indices, values, output_shape),
+                                      false_fn=lambda: [indices, values])
             # 3. Create feature map
-            feature_map = tf.scatter_nd(indices, values, shape=[img_size / self.shrink_factor,
-                                                                img_size / self.shrink_factor,
-                                                                len(anchors),
-                                                                5 + self.num_classes])
+            # @TODO: SparseTensor ?
+            # https://www.tensorflow.org/api_docs/python/tf/scatter_n
+            feature_map = tf.scatter_nd(indices, values, shape=output_shape)
+            # feature_map = tf.SparseTensor(indices, values,output_shape)
 
             return img, feature_map
 
@@ -99,7 +103,6 @@ class TFData(object):
                                                  (tf.TensorShape([]), tf.TensorShape([None])))
         if shuffle:
             dataset = dataset.shuffle(buffer_size=100)
-
         dataset = dataset.map(lambda filename, label:
                               tuple(tf.py_func(read_img_file,
                                                [filename, label],
