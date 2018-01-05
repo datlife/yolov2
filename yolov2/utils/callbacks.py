@@ -9,12 +9,12 @@ def create_callbacks(backup_dir, tfboard_dir='./logs'):
         print("A backup directory has been created")
 
     tf_board = keras.callbacks.TensorBoard(log_dir       = tfboard_dir,
-                                           histogram_freq= 1,
-                                           write_graph   = True,
-                                           write_images  = True)
+                                           histogram_freq= 0,
+                                           write_graph   = False,
+                                           write_images  = False)
 
-    backup = keras.callbacks.ModelCheckpoint(backup_dir +
-                                             "best_%s-{epoch:02d}-{val_loss:.2f}.weights" % 'darknet19',
+    backup = keras.callbacks.ModelCheckpoint(os.path.join(backup_dir,
+                                             "best_%s-{epoch:02d}-{val_loss:.2f}.weights" % 'darknet19'),
                                              monitor          = 'val_loss',
                                              save_weights_only= True,
                                              save_best_only   = True)

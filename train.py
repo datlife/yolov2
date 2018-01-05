@@ -56,6 +56,13 @@ def _main_():
     image_size    = cfg['model']['image_size']
     shrink_factor = cfg['model']['shrink_factor']
 
+    # Hyper-parameters
+    training_cfg  = cfg['training_params']
+    epochs        = training_cfg['epochs']
+    batch_size    = training_cfg['batch_size']
+    learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
+    backup_dir    = training_cfg['backup_dir']
+
     # Config Anchors and encoding dict
     label_dict = parse_label_map(cfg['label_map'])
 
@@ -66,7 +73,7 @@ def _main_():
     # PREPARE DATA  #
     # ###############
     inv_map = {v: k for k, v in label_dict.iteritems()}
-    inputs, labels = parse_inputs(training_data, inv_map)
+    images, labels = parse_inputs(training_data, inv_map)
 
     # using tf.data.Dataset to generate training samples
     tfdata = TFData(num_classes, anchors, shrink_factor)
@@ -84,21 +91,13 @@ def _main_():
     # ###################
     # COMPILE AND TRAIN #
     # ###################
-
-    # Hyper-parameters
-    training_cfg  = cfg['training_params']
-    epochs        = training_cfg['epochs']
-    batch_size    = training_cfg['batch_size']
-    learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
-    backup_dir    = training_cfg['backup_dir']
-
     objective_function = YOLOV2Loss(anchors, num_classes)
 
     model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
                   loss     = objective_function.compute_loss)
 
     if weight_file:
-        model.load_weights(weight_file)
+        model.load_weights(weight_file, by_name=True)
         print("Weight file has been loaded in to model")
 
     # initialize the weights of the detection (last) layer to avoid nan when just starting training
@@ -108,17 +107,19 @@ def _main_():
     layer.set_weights([new_kernel, new_bias])
 
     model.summary()
+    callbacks = create_callbacks(backup_dir)
 
     for current_epoch in range(epochs):
         # Create 10-fold split
-        x_train, x_val = train_test_split(inputs, test_size=0.2)
+        x_train, x_val = train_test_split(images, test_size=0.2)
         y_train = [labels[k] for k in x_train]
         y_val   = [labels[k] for k in x_val]
 
         model.fit_generator(generator       = tfdata.generator(x_train, y_train, image_size, batch_size),
                             steps_per_epoch = 1000,
                             validation_data = tfdata.generator(x_val, y_val, image_size, batch_size),
-                            validation_steps= 100,
+                            validation_steps= int(len(x_val)/ batch_size),
+                            callbacks       = callbacks,
                             verbose         = 1,
                             workers         = 0)
 
