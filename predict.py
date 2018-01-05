@@ -7,6 +7,7 @@ import yaml
 import argparse
 import numpy as np
 
+from keras.layers import Input
 from yolov2.zoo import yolov2_darknet19
 from yolov2.utils.painter import draw_boxes
 from yolov2.utils.parser import parse_label_map
@@ -44,7 +45,6 @@ def _main_():
     # Define Keras Model
     # ###################
     model_cfg  = config['model']
-    from keras.layers import Input
 
     inputs = Input(shape=(None, None, 3))
     model = yolov2_darknet19(inputs,
@@ -57,7 +57,6 @@ def _main_():
 
     model.load_weights(args.weights)
     model.summary()
-
 
     # #####################
     # Make one prediction #

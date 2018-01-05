@@ -30,10 +30,11 @@ python train.py \
 import yaml
 import keras
 import numpy as np
+from keras.layers import Input
 from sklearn.model_selection import train_test_split
 
 from yolov2.zoo import yolov2_darknet19
-from yolov2.core.loss import yolov2_loss
+from yolov2.core.loss import YOLOV2Loss
 from yolov2.utils.generator import TFData
 from yolov2.utils.callbacks import create_callbacks
 from yolov2.utils.parser import parse_inputs, parse_label_map
@@ -81,8 +82,9 @@ def _main_():
     # Define Keras Model
     # ###################
     # @TODO: how to automatically load weights ?
-    model = yolov2_darknet19(is_training= True,
-                             img_size   = image_size,
+    inputs = Input(shape=(None, None, 3))
+    model = yolov2_darknet19(inputs,
+                             is_training= True,
                              anchors    = anchors,
                              num_classes= num_classes)
 
@@ -101,8 +103,10 @@ def _main_():
     learning_rate = training_cfg['learning_rate']  # this model has been pre-trained, LOWER learning rate is needed
     backup_dir    = training_cfg['backup_dir']
 
+    loss_obj = YOLOV2Loss(anchors, num_classes, warm_up_steps=100)
+
     model.compile(optimizer= keras.optimizers.Adam(lr=learning_rate),
-                  loss     = yolov2_loss(anchors, num_classes))
+                  loss     = loss_obj.compute_loss)
 
     for current_epoch in range(epochs):
         # Create 10-fold split
