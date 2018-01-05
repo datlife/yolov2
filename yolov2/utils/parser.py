@@ -36,7 +36,7 @@ def parse_inputs(filename, label_dict):
             else:
                 training_instances[img_path] = [an_object]
     inputs = training_instances.keys()
-    labels = {k: np.stack(v).flatten() for k, v in training_instances.iteritems()}
+    labels = {k: np.stack(v).flatten() for k, v in training_instances.items()}
 
     return inputs, labels
 

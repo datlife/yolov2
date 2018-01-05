@@ -24,8 +24,8 @@ class TFData(object):
         self.shrink_factor = shrink_factor
 
     def generator(self, images, labels, img_size, shuffle=True, batch_size=4):
-        dataset = self.create_tfdata(images, labels, img_size, shuffle, batch_size)
-        iterator = dataset.make_one_shot_iterator()
+        dataset    = self.create_tfdata(images, labels, img_size, shuffle, batch_size)
+        iterator   = dataset.make_one_shot_iterator()
         next_batch = iterator.get_next()
         while True:
             yield K.get_session().run(next_batch)
@@ -35,6 +35,10 @@ class TFData(object):
         # swapping width and height
 
         anchors = np.array(self.anchors).astype(np.float32)[:, [1, 0]]
+        output_shape = tf.TensorShape([img_size / self.shrink_factor,
+                                       img_size / self.shrink_factor,
+                                       len(anchors),
+                                       5 + self.num_classes])
 
         def read_img_file(filename, label):
             image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
@@ -82,14 +86,11 @@ class TFData(object):
             one_hot = tf.one_hot(tf.cast(tf.squeeze(classes, axis=1), tf.uint8), self.num_classes)
             values = tf.concat([boxes, objectness, one_hot], axis=1)
 
-            output_shape = tf.TensorShape([img_size / self.shrink_factor,
-                                           img_size / self.shrink_factor,
-                                           len(anchors),
-                                           5 + self.num_classes])
             # Filter out duplicated indices
-            indices, values = tf.cond(pred=tf.greater(tf.shape(indices)[0], 1),
-                                      true_fn=lambda: find_and_solve_collided_indices(indices, values, output_shape),
-                                      false_fn=lambda: [indices, values])
+            indices, values = tf.cond(pred    = tf.greater(tf.shape(indices)[0], 1),
+                                      true_fn = lambda: find_and_solve_collided_indices(indices, values, output_shape),
+                                      false_fn= lambda: [indices, values])
+
             # 3. Create feature map
             # @TODO: SparseTensor ?
             # https://www.tensorflow.org/api_docs/python/tf/scatter_n

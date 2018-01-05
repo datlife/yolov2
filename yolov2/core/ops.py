@@ -35,6 +35,9 @@ def find_and_solve_collided_indices(indices, values, shape):
     return [updated_indices, updated_values]
 
 
+# The below codes are from TensorFlow team
+# Citation: https://github.com/tensorflow/models/tree/master/research/object_detection
+
 def iou(boxes_list1, boxes_list2, scope=None):
     """
       Args:

@@ -3,6 +3,8 @@ Loss (Objective) Function definition for You Only Look Once version 2
 """
 import tensorflow as tf
 
+EPSILON = 1e-8
+
 
 class YOLOV2Loss(object):
 
@@ -13,30 +15,34 @@ class YOLOV2Loss(object):
 
     def compute_loss(self, y_true, y_pred):
 
-        output_dims = tf.shape(y_pred)
-        height      = output_dims[1]
-        width       = output_dims[2]
+        with tf.name_scope("OutputShape"):
+            output_dims = tf.shape(y_pred)
+            height      = output_dims[1]
+            width       = output_dims[2]
 
-        pred_boxes   = y_pred[..., 0:4]
-        pred_conf    = y_pred[..., 4]
-        pred_classes = y_pred[..., 5:]
+        with tf.name_scope("Predictions"):
+            pred_boxes   = y_pred[..., 0:4]
+            pred_conf    = y_pred[..., 4]
+            pred_classes = y_pred[..., 5:]
 
-        gt_boxes   = y_true[..., 0:4]
-        gt_conf    = y_true[..., 4]
-        gt_classes = y_true[..., 5:]
+        with tf.name_scope("GroundTruths"):
+            gt_boxes   = y_true[..., 0:4]
+            gt_conf    = y_true[..., 4]
+            gt_classes = y_true[..., 5:]
 
-        obj_cells      = tf.expand_dims(y_true[..., 4], -1)
-        noobj_cells    = tf.expand_dims(1.0 - y_true[..., 4], -1)
+        with tf.name_scope("ObjectMask"):
+            obj_cells      = tf.expand_dims(y_true[..., 4], -1)
+            noobj_cells    = tf.expand_dims(1.0 - y_true[..., 4], -1)
 
-        num_objects    = tf.reduce_sum(tf.to_float(obj_cells > 0.0))
-        num_no_objects = tf.reduce_sum(tf.to_float(noobj_cells > 0.0))
+            num_objects    = tf.reduce_sum(tf.to_float(obj_cells > 0.0))
+            num_no_objects = tf.reduce_sum(tf.to_float(noobj_cells > 0.0))
 
         with tf.name_scope('RegressionLoss'):
             # Convert [y1, x1, y2, x2] to [y_c, x_c, h, w] coordinates
-            gt_wh = gt_boxes[..., 2:4] - gt_boxes[..., 0:2]
+            gt_wh   = gt_boxes[..., 2:4] - gt_boxes[..., 0:2]
             pred_wh = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
 
-            gt_centroids = gt_boxes[..., 0:2] + (gt_wh / 2.0)
+            gt_centroids   = gt_boxes[..., 0:2] + (gt_wh / 2.0)
             pred_centroids = pred_boxes[..., 0:2] + (pred_wh / 2.0)
 
             #  Create offset grid
@@ -56,8 +62,8 @@ class YOLOV2Loss(object):
             no_obj_coord = noobj_cells * (tf.square(pred_centroids - grid_centroids) +
                                           tf.square(tf.sqrt(pred_wh) - tf.sqrt(tf.ones_like(pred_wh) * grid_anchors)))
             # Average out
-            obj_coord = tf.reduce_sum(obj_coord) / (num_objects + 1e-6)
-            no_obj_coord = tf.reduce_sum(no_obj_coord) / (num_no_objects + 1e-6)
+            obj_coord   = tf.reduce_sum(obj_coord) / (num_objects + EPSILON)
+            no_obj_coord = tf.reduce_sum(no_obj_coord) / (num_no_objects + EPSILON)
 
             coord_loss = 5.0 * obj_coord + 0.01 * no_obj_coord
 
@@ -65,11 +71,10 @@ class YOLOV2Loss(object):
             box_iou = self.compute_iou(gt_boxes, pred_boxes)
             best_iou = tf.expand_dims(tf.reduce_max(box_iou, axis=-1), -1)
 
-            obj_conf = obj_cells * tf.expand_dims(tf.square(pred_conf - gt_conf * box_iou), -1)
+            obj_conf    = obj_cells * tf.expand_dims(tf.square(pred_conf - gt_conf * box_iou), -1)
             no_obj_conf = noobj_cells * tf.expand_dims(tf.square(pred_conf - 0.0) * tf.to_float(best_iou < 0.6), -1)
-
-            obj_conf = tf.reduce_sum(obj_conf) / (num_objects + 1e-6)
-            no_obj_conf = tf.reduce_sum(no_obj_conf) / (num_no_objects + 1e-6)
+            obj_conf    = tf.reduce_sum(obj_conf) / (num_objects + EPSILON)
+            no_obj_conf = tf.reduce_sum(no_obj_conf) / (num_no_objects + EPSILON)
 
             conf_loss = 1.0 * obj_conf + 0.01 * no_obj_conf
 
@@ -78,26 +83,30 @@ class YOLOV2Loss(object):
 
             cls_loss = tf.nn.softmax_cross_entropy_with_logits(labels=gt_classes, logits=pred_classes)
             cls_loss = obj_cells * tf.expand_dims(cls_loss, -1)
-            cls_loss = 1.0 * tf.reduce_sum(cls_loss) / (num_objects + 1e-6)
+            cls_loss = 1.0 * tf.reduce_sum(cls_loss) / (num_objects + EPSILON)
 
-        return coord_loss + conf_loss + cls_loss
+        with tf.name_scope("TotalLoss"):
+            total_loss = coord_loss + conf_loss + cls_loss
+
+        return total_loss
 
     def compute_iou(self, gt_boxes, pred_boxes, scope=None):
         with tf.name_scope(scope, 'IoU'):
-            with tf.name_scope('area'):
+            with tf.name_scope('Area'):
                 gt_wh = gt_boxes[..., 2:4] - gt_boxes[..., 0:2]
                 pr_wh = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
 
                 gt_area = gt_wh[..., 0] * gt_wh[..., 1]
                 pr_area = pr_wh[..., 0] * pr_wh[..., 1]
 
-            with tf.name_scope('intersections'):
+            with tf.name_scope('Intersections'):
                 intersect_mins = tf.maximum(gt_boxes[..., 0:2], pred_boxes[..., 0:2])
                 intersect_maxes = tf.minimum(gt_boxes[..., 2:4], pred_boxes[..., 2:4])
                 intersect_hw = tf.maximum(intersect_maxes - intersect_mins, 0.)
                 intersections = intersect_hw[..., 0] * intersect_hw[..., 1]
+            with tf.name_scope("Unions"):
+                unions = gt_area + pr_area - intersections
 
-            unions = gt_area + pr_area - intersections
             iou = tf.where(tf.equal(intersections, 0.0),
                            tf.zeros_like(intersections),
                            tf.truediv(intersections, unions))

@@ -47,13 +47,11 @@ class YOLOv2MetaArch(object):
             # Feature Extractor
             feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
 
-            with tf.name_scope("Detector"):
-                x       = self.detector(feature_map, pass_through_layers)
-                x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
-                                 name='output_features')(x)
-
-                predictions = Lambda(lambda x: self.interpret_yolov2(x),
-                                     name='predictions')(x)
+            x       = self.detector(feature_map, pass_through_layers)
+            x       = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
+                             name='OutputFeatures')(x)
+            predictions = Lambda(lambda x: self.interpret_yolov2(x),
+                                 name='Predictions')(x)
             return predictions
 
     def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
@@ -79,7 +77,8 @@ class YOLOv2MetaArch(object):
         shape = tf.shape(predictions)
         height, width = shape[1], shape[2]
 
-        #  @TODO: waiting for Tf.repeat() in coming TF version
+        #  @TODO: waiting for Tf.repeat() in upcoming TF version
+
         # ##################
         #  Create offset map
         # ##################
