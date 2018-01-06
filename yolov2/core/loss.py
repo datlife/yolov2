@@ -8,10 +8,10 @@ EPSILON = 1e-8
 
 class YOLOV2Loss(object):
 
-    def __init__(self, anchors, num_classes, warm_up_steps=50):
+    def __init__(self, anchors, num_classes, summary=True):
         self.anchors = anchors
         self.num_classes = num_classes
-        self.warm_up_steps = warm_up_steps
+        self.summary = summary
 
     def compute_loss(self, y_true, y_pred):
 
@@ -87,6 +87,14 @@ class YOLOV2Loss(object):
 
         with tf.name_scope("TotalLoss"):
             total_loss = coord_loss + conf_loss + cls_loss
+
+        if self.summary:
+            tf.summary.scalar("total_loss", total_loss)
+            tf.summary.scalar("regression_loss", coord_loss)
+            tf.summary.scalar("object_confidence_loss", obj_conf)
+            tf.summary.scalar("classification_loss", cls_loss)
+            tf.summary.scalar("AverageIOU", tf.reduce_mean((obj_cells * box_iou) / (num_objects + EPSILON)))
+            tf.summary.scalar("Recall", tf.reduce_sum(tf.to_float(box_iou > 0.5)))
 
         return total_loss
 

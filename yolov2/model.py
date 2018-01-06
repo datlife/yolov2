@@ -25,7 +25,7 @@ from yolov2.utils.parser import parse_inputs, parse_label_map
 
 class YOLOv2(object):
 
-    def __init__(self, is_training, feature_extractor, detector, config_dict):
+    def __init__(self, is_training, feature_extractor, detector, config_dict, add_summaries=True):
 
         self.config      = config_dict
         self.is_training = is_training
@@ -36,45 +36,61 @@ class YOLOv2(object):
         self.label_dict  = parse_label_map(config_dict['label_map'])
 
         self.model       = self._construct_model(is_training, feature_extractor, detector)
+        self.summary     = add_summaries
 
-    def train(self, training_data, epochs, batch_size, learning_rate):
+    def train(self, training_data, epochs, steps_per_epoch, batch_size, learning_rate, test_size=0.2):
 
         # ###############
         # Compile model #
         # ###############
-        loss  = YOLOV2Loss(self.anchors, self.num_classes)
+        loss  = YOLOV2Loss(self.anchors, self.num_classes, summary=True)
         self.model.compile(optimizer=keras.optimizers.Adam(lr=learning_rate),
                            loss=loss.compute_loss)
 
         # ###############
         # Prepare Data  #
         # ###############
-        # @TODO: Multi-scale training
-        image_size = self.config['model']['image_size']
         inv_map = {v: k for k, v in self.label_dict.items()}
         inputs, labels = parse_inputs(training_data, inv_map)
 
-        # use tf.data.Dataset as a data generator
+        # we use tf.data.Dataset as a data generator,
+        # Empirically, it runs slower than loading directly into memory
+        # However, it is scalable and can be optimized later
         tfdata = TFData(self.num_classes, self.anchors, self.config['model']['shrink_factor'])
-        tf.summary.FileWriter('./logs/', graph=K.get_session().graph)
 
-        # for current_epoch in range(epochs):
-        #
-        #     # Create 10-fold split
-        #     x_train, x_val = train_test_split(inputs, test_size=0.2)
-        #     y_train = [labels[k] for k in x_train]
-        #     y_val = [labels[k] for k in x_val]
-        #
-        #     self.model.fit_generator(generator       = tfdata.generator(x_train, y_train, image_size, batch_size),
-        #                              steps_per_epoch = 1000,
-        #                              verbose=1,
-        #                              workers=0)
-        #
-        #     self.model.evaluate_generator(generator = tfdata.generator(x_val, y_val, image_size, batch_size),
-        #                                   steps     = 100,
-        #                                   workers   = 0)
+        # ####################
+        # Enable Tensorboard #
+        # ####################
+        merged          = tf.summary.merge_all()
+        summary_writer  = tf.summary.FileWriter(self.config['training_params']['backup'])
+        sample_images = None
+
+        for current_epoch in range(epochs):
+            # @TODO: Multi-scale training
+            image_size = self.config['model']['image_size']
+
+            # Create 10-fold split
+            x_train, x_val = train_test_split(inputs, test_size=test_size)
+            y_train = [labels[k] for k in x_train]
+            y_val = [labels[k] for k in x_val]
+
+            self.model.fit_generator(generator       = tfdata.generator(x_train, y_train, image_size, batch_size),
+                                     steps_per_epoch = steps_per_epoch,
+                                     verbose=1,
+                                     workers=0)
+
+            self.model.evaluate_generator(generator = tfdata.generator(x_val, y_val, image_size, batch_size),
+                                          steps     = 100,
+                                          workers   = 0)
 
             # @TODO: Summaries to TensorBoard
+            if self.summary:
+                global_step = (1 + current_epoch)*steps_per_epoch
+                print("Summarizing result")
+                # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
+                summary_writer.add_summary(merged, global_step)
+
+                # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
     def evaluate(self, testing_data, summaries=True):
         raise NotImplemented
@@ -107,3 +123,23 @@ class YOLOv2(object):
 
     def get_model(self):
         return self.model
+
+    def _create_summary(self, model):
+        def is_indexed_slices(grad):
+            return type(grad).__name__ == 'IndexedSlices'
+
+        for layer in model.layers[2:]:  # remove input and preprocessor layers
+            tensor_name = layer.name.replace(':', '_')
+            tf.summary.histogram(tensor_name, layer.output)
+            for weight in layer.weights:
+                tensor_name = weight.name.replace(':', '_')
+                # Summary Activation (Forward)
+                tf.summary.histogram(tensor_name, weight)
+
+                # # Summary Gradients (Backward)
+                # grads = self.model.optimizer.get_gradients(self.model.total_loss, weight)
+                # grads = [grad.values if is_indexed_slices(grad) else grad for grad in grads]
+                # tf.summary.histogram('{}_grad'.format(tensor_name), grads)
+                #
+                if hasattr(layer, 'output'):
+                    tf.summary.histogram('{}_out'.format(layer.name), layer.output)
