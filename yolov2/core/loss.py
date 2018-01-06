@@ -93,8 +93,8 @@ class YOLOV2Loss(object):
             tf.summary.scalar("regression_loss", coord_loss)
             tf.summary.scalar("object_confidence_loss", obj_conf)
             tf.summary.scalar("classification_loss", cls_loss)
-            tf.summary.scalar("AverageIOU", tf.reduce_mean((obj_cells * box_iou) / (num_objects + EPSILON)))
-            tf.summary.scalar("Recall", tf.reduce_sum(tf.to_float(box_iou > 0.5)))
+            # tf.summary.scalar("AverageIOU", tf.reduce_mean((obj_cells * box_iou) / (num_objects + EPSILON)))
+            # tf.summary.scalar("Recall", tf.reduce_sum(tf.to_float(box_iou > 0.5)))
 
         return total_loss
 
