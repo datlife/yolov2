@@ -4,11 +4,13 @@ import keras.backend as K
 
 class DetectionMonitor(TensorBoard):
 
-    def __init__(self, val_generator, val_steps, global_step, **kwargs):
+    def __init__(self, **kwargs):
 
         super(DetectionMonitor, self).__init__(**kwargs)
-        self.generator = val_generator
-        self.val_steps = val_steps
+    
+    def update(self, generator, steps, global_step):
+        self.generator = generator
+        self.val_steps = steps
         self.global_step = global_step
 
     def on_epoch_end(self, epoch, logs=None):

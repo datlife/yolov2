@@ -64,9 +64,12 @@ class YOLOv2(object):
         # merged          = tf.summary.merge_all()
         # summary_writer  = tf.summary.FileWriter()
         #
+        monitor = DetectionMonitor(log_dir       = self.config['training_params']['backup_dir'],
+                                   write_grads   = False,
+                                   write_graph   = True)
 
         for current_epoch in range(epochs):
-            global_step = (1 + current_epoch) * steps_per_epoch
+            global_step = (current_epoch) * steps_per_epoch
 
             # @TODO: Multi-scale training
             image_size = self.config['model']['image_size']
@@ -74,19 +77,15 @@ class YOLOv2(object):
             x_train, x_val = train_test_split(inputs, test_size=test_size)
             y_train = [labels[k] for k in x_train]
             y_val   = [labels[k] for k in x_val]
-
-            monitor = DetectionMonitor(val_generator=tfdata.generator(x_val, y_val, image_size, batch_size),
-                                       val_steps=1,
-                                       global_step=global_step,
-                                       log_dir=self.config['training_params']['backup_dir'],
-                                       write_grads=False,
-                                       write_graph=True)
-
+            
+            monitor.update(tfdata.generator(x_val, y_val, image_size, batch_size),
+                           int(len(x_val)/batch_size),
+                           global_step)       
             self.model.fit_generator(generator       = tfdata.generator(x_train, y_train, image_size, batch_size),
-                                     steps_per_epoch = 1,
+                                     steps_per_epoch = steps_per_epoch,
                                      callbacks       = [monitor],
-                                     verbose=1,
-                                     workers=0)
+                                     verbose         = 1,
+                                     workers         = 0)
 
             # @TODO: Summaries to TensorBoard
             # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
@@ -116,7 +115,7 @@ class YOLOv2(object):
 
             model = Model(inputs=inputs, outputs=outputs)
 
-        # model.load_weights(self.config['model']['weight_file'])
+        model.load_weights(self.config['model']['weight_file'])
         print("Weight file has been loaded in to model")
 
         return model
