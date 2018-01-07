@@ -1,6 +1,6 @@
 import tensorflow as tf
-import keras.backend as K
-from keras.engine.topology import Layer
+from tensorflow.python.keras.layers import Layer
+K = tf.keras.backend
 
 
 class ImageResizer(Layer):
@@ -77,8 +77,73 @@ class Reroute(Layer):
             return tuple([shape[0], None, None, block_size * block_size * shape[-1]])
 
     def get_config(self):
-        config = {'block_size':self.block_size}
+        config = {'block_size': self.block_size}
         base_config = super(Reroute, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class OutputInterpreter(Layer):
+    """
+    Convert output features into predictions
+    """
+    def __init__(self, anchors, num_classes, **kwargs):
+        super(OutputInterpreter, self).__init__(**kwargs)
+        self.anchors = anchors
+        self.num_classes = num_classes
+
+    def build(self, input_shape):
+        super(OutputInterpreter, self).build(input_shape)
+
+    def call(self, output_features, **kwargs):
+        shape = tf.shape(output_features)
+        height, width = shape[1], shape[2]
+
+        #  @TODO: waiting for Tf.repeat() in upcoming TF version
+
+        # ##################
+        #  Create offset map
+        # ##################
+        cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
+        cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
+        cy = tf.reshape(cy, [-1, height, width, 1])
+        c_xy = tf.to_float(tf.stack([cx, cy], -1))
+
+        anchors_tensor = tf.to_float(K.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]))
+        output_size = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
+
+        outputs = K.reshape(output_features, [-1, height, width, len(self.anchors), self.num_classes + 5])
+
+        # ##################
+        # Interpret outputs
+        # ##################
+        #  (Ref: YOLO-9000 paper)
+        box_xy = K.sigmoid(outputs[..., :2]) + c_xy
+        box_wh = K.exp(outputs[..., 2:4]) * anchors_tensor
+        box_confidence = K.sigmoid(outputs[..., 4:5])
+        box_class_probs = K.softmax(outputs[..., 5:])
+
+        # Convert coordinates to relative coordinates (percentage)
+        box_xy = box_xy / output_size
+        box_wh = box_wh / output_size
+
+        # Calculate corner points of bounding boxes
+        box_mins = box_xy - (box_wh / 2.)
+        box_maxes = box_xy + (box_wh / 2.)
+
+        # Y1, X1, Y2, X2
+        boxes = tf.concat([box_mins[..., 1:2], box_mins[..., 0:1],  # Y1 X1
+                           box_maxes[..., 1:2], box_maxes[..., 0:1]], axis=-1)  # Y2 X2
+
+        outputs = tf.concat([boxes, box_confidence, box_class_probs], axis=-1)
+        return outputs
+
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0], input_shape[1], input_shape[2], len(self.anchors), 5 + self.num_classes])
+
+    def get_config(self):
+        config = {'anchors': self.anchors,
+                  'num_classes': self.num_classes}
+        base_config = super(OutputInterpreter, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
@@ -87,11 +152,11 @@ class PostProcessor(Layer):
     Perform Non-Max Suppression to calculate prediction
     """
     def __init__(self, score_threshold, iou_threshold, max_boxes=1000, **kwargs):
+        super(PostProcessor, self).__init__(**kwargs)
+
         self.max_boxes         = max_boxes
         self.iou_threshold     = iou_threshold
         self.score_threshold   = score_threshold
-
-        super(PostProcessor, self).__init__(**kwargs)
 
     def build(self, input_shape):
         super(PostProcessor, self).build(input_shape)

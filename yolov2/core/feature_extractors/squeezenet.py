@@ -1,9 +1,9 @@
 import tensorflow as tf
-from keras.layers import Conv2D
-from keras.layers import MaxPool2D
-from keras.layers import Activation
-from keras.layers import concatenate
-from keras.layers import GlobalAvgPool2D
+from tensorflow.python.keras.layers import Conv2D
+from tensorflow.python.keras.layers import MaxPool2D
+from tensorflow.python.keras.layers import Activation
+from tensorflow.python.keras.layers import concatenate
+from tensorflow.python.keras.layers import GlobalAvgPool2D
 
 
 def squeezenet_preprocces_func(image):

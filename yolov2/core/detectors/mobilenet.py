@@ -1,4 +1,4 @@
-from keras.layers import concatenate
+from tensorflow.python.keras.layers import concatenate
 from ..custom_layers import Reroute
 from ..feature_extractors.mobilenet import _depthwise_conv_block
 

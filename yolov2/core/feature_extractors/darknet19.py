@@ -2,13 +2,13 @@
 DarKNet 19 Architecture
 """
 import tensorflow as tf
-from keras.models import Model
-from keras.layers import Conv2D
-from keras.layers import MaxPool2D
-from keras.layers import BatchNormalization, Activation
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers import GlobalAvgPool2D
-from keras.regularizers import l2
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.layers import Conv2D
+from tensorflow.python.keras.layers import MaxPool2D
+from tensorflow.python.keras.layers import BatchNormalization, Activation
+from tensorflow.python.keras.layers import LeakyReLU
+from tensorflow.python.keras.layers import GlobalAvgPool2D
+from tensorflow.python.keras.regularizers import l2
 from ..custom_layers import Preprocessor
 
 
