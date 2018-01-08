@@ -23,6 +23,10 @@ from yolov2.utils.parser import parse_inputs, parse_label_map
 from yolov2.utils.tensorboard import TensorBoard
 
 
+# @TODO: Multi-scale training
+# @TODO: add  ClassificationLoss, Localization, ObjectConfidence
+# @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
+
 class YOLOv2(object):
 
   def __init__(self, is_training, feature_extractor, detector, config_dict, add_summaries=True):
@@ -71,16 +75,15 @@ class YOLOv2(object):
       save_best_only=True,
       save_weights_only=True)
     for current_epoch in range(epochs):
-      # @TODO: Multi-scale training
-      # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
-      # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
       image_size = self.config['model']['image_size']
       x_train, x_val = train_test_split(inputs, test_size=test_size)
       y_train = [labels[k] for k in x_train]
       y_val = [labels[k] for k in x_val]
 
-      val_images, val_labels = tfdata.generator(x_val, y_val, image_size, batch_size=batch_size * 20).next()
+      val_images, val_labels = tfdata.generator(
+        x_val, y_val, image_size, batch_size=batch_size * 20).next()
+
       self.model.fit_generator(
         generator=tfdata.generator(x_train, y_train, image_size, batch_size),
         steps_per_epoch=1000,
@@ -99,7 +102,7 @@ class YOLOv2(object):
                             anchors=self.anchors,
                             num_classes=self.num_classes)
 
-    inputs = Input(shape=(None, None, 3), name='input_images')
+    inputs  = Input(shape=(None, None, 3), name='input_images')
     outputs = yolov2.predict(inputs)
     if is_training:
       model = Model(inputs=inputs, outputs=outputs)
@@ -109,9 +112,7 @@ class YOLOv2(object):
                                     deploy_params['iou_threshold'],
                                     deploy_params['score_threshold'],
                                     deploy_params['maximum_boxes'])
-
       model = Model(inputs=inputs, outputs=outputs)
-
     model.load_weights(self.config['model']['weight_file'])
     print("Weight file has been loaded in to model")
 
