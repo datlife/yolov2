@@ -1,5 +1,4 @@
 """
-YOLOv2 Meta-Architecture
 
         images --> feature extractor --> feature map --> detector --> output feature map
 
@@ -18,22 +17,27 @@ from keras.layers import Lambda
 from .custom_layers import PostProcessor
 
 
-
 class YOLOv2MetaArch(object):
+  """YOLOv2 Meta-Architecture
+
+
+  """
   def __init__(self,
                feature_extractor,
                detector,
                anchors,
                num_classes):
-    """
-    YOLOv2 meta architecture, it consists of:
-        * Preprocessor      - a custom Keras layer that pre-process inputs
-        * Feature Extractor - a FeatureExtractor object
-        * Detector          - a Detector Object
-    :param feature_extractor:
-    :param detector:
-    :param anchors:
-    :param num_classes:
+    """Constructor
+
+        YOLOv2 meta architecture, it consists of:
+        * Preprocessor      -
+        * Feature Extractor -
+        * Detector          -
+    Args:
+      feature_extractor:  a FeatureExtractor object
+      detector:           a Detector Object
+      anchors:
+      num_classes:
     """
 
     self.anchors = anchors
@@ -42,8 +46,15 @@ class YOLOv2MetaArch(object):
     self.detector = detector
 
   def predict(self, resized_inputs):
+    """
+
+    Args:
+      resized_inputs:
+
+    Returns:
+
+    """
     with tf.name_scope('YOLOv2'):
-      # Feature Extractor
       feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
 
       x = self.detector(feature_map, pass_through_layers)
@@ -54,11 +65,13 @@ class YOLOv2MetaArch(object):
       return predictions
 
   def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
-    """
-    Preform non-max suppression to calculate outputs:
-    Using during evaluation/interference
+    """Preform non-max suppression to calculate outputs:
+
+      Using during evaluation/interference
+
     Args:
         out feature map from network
+
     Output:
        Bounding Boxes - Classes - Probabilities
     """
