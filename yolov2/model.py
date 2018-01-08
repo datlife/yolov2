@@ -31,7 +31,7 @@ class YOLOv2(object):
     self.is_training = is_training
 
     # @TODO: remove 608.
-    self.anchors = np.array(config_dict['anchors']) / (608. / 32)
+    self.anchors = np.array(config_dict['anchors']) 
     self.num_classes = config_dict['model']['num_classes']
     self.label_dict = parse_label_map(config_dict['label_map'])
 
@@ -72,8 +72,10 @@ class YOLOv2(object):
       save_weights_only=True)
     for current_epoch in range(epochs):
       # @TODO: Multi-scale training
-      image_size = self.config['model']['image_size']
+      # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
+      # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
+      image_size = self.config['model']['image_size']
       x_train, x_val = train_test_split(inputs, test_size=test_size)
       y_train = [labels[k] for k in x_train]
       y_val = [labels[k] for k in x_val]
@@ -89,10 +91,6 @@ class YOLOv2(object):
         initial_epoch=current_epoch,
         verbose=1,
         workers=0)
-
-      # @TODO: Summaries to TensorBoard
-      # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
-      # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
   def _construct_model(self, is_training, feature_extractor, detector):
 

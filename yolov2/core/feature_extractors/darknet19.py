@@ -73,6 +73,7 @@ def darknet19(inputs, num_classes=1000, include_top=False):
   return x, pass_through_layers
 
 
+
 def conv_block(x, filters, kernel_size, name=None):
   """Standard YOLOv2 Convolutional Block as suggested in YOLO9000 paper
   """

@@ -18,6 +18,7 @@ from keras.layers import Lambda
 from .custom_layers import PostProcessor
 
 
+
 class YOLOv2MetaArch(object):
   def __init__(self,
                feature_extractor,
