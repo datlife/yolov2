@@ -13,7 +13,7 @@ from ..custom_layers import Preprocessor
 
 
 def yolov2_preprocess_func(inputs):
-    inputs = inputs / 255.
+    inputs = inputs/ 255
     return inputs
 
 

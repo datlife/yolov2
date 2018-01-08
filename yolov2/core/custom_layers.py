@@ -96,7 +96,7 @@ class OutputInterpreter(Layer):
 
     def call(self, output_features, **kwargs):
         shape = tf.shape(output_features)
-        height, width = shape[1], shape[2]
+        batch, height, width = shape[0], shape[1], shape[2]
 
         #  @TODO: waiting for Tf.repeat() in upcoming TF version
 
@@ -107,17 +107,17 @@ class OutputInterpreter(Layer):
         cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
         cy = tf.reshape(cy, [-1, height, width, 1])
         c_xy = tf.to_float(tf.stack([cx, cy], -1))
-
+        # c_xy = tf.reshape(c_xy, [1, 1, 1, tf.shape(c_xy)[0], tf.shape(c_xy)[1]])
         anchors_tensor = tf.to_float(K.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]))
         output_size = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
 
-        outputs = K.reshape(output_features, [-1, height, width, len(self.anchors), self.num_classes + 5])
+        outputs = K.reshape(output_features, [batch, height, width, len(self.anchors), self.num_classes + 5])
 
         # ##################
         # Interpret outputs
         # ##################
         #  (Ref: YOLO-9000 paper)
-        box_xy = K.sigmoid(outputs[..., :2]) + c_xy
+        box_xy = K.sigmoid(outputs[..., 0:2]) + c_xy
         box_wh = K.exp(outputs[..., 2:4]) * anchors_tensor
         box_confidence = K.sigmoid(outputs[..., 4:5])
         box_class_probs = K.softmax(outputs[..., 5:])
@@ -131,10 +131,12 @@ class OutputInterpreter(Layer):
         box_maxes = box_xy + (box_wh / 2.)
 
         # Y1, X1, Y2, X2
-        boxes = tf.concat([box_mins[..., 1:2], box_mins[..., 0:1],  # Y1 X1
-                           box_maxes[..., 1:2], box_maxes[..., 0:1]], axis=-1)  # Y2 X2
+        boxes =K.concatenate([box_mins[..., 1:2],
+                             box_mins[..., 0:1],  # Y1 X1
+                             box_maxes[..., 1:2],
+                             box_maxes[..., 0:1]], axis=-1)  # Y2 X2
 
-        outputs = tf.concat([boxes, box_confidence, box_class_probs], axis=-1)
+        outputs = K.concatenate([boxes, box_confidence, box_class_probs], axis=-1)
         return outputs
 
     def compute_output_shape(self, input_shape):

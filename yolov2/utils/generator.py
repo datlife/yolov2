@@ -2,10 +2,9 @@ import cv2
 import itertools
 import numpy as np
 import tensorflow as tf
+import keras.backend as K
 from ..core.ops import iou
 from ..core.ops import find_and_solve_collided_indices
-
-K = tf.keras.backend
 
 
 class TFData(object):
@@ -25,14 +24,16 @@ class TFData(object):
         self.shrink_factor = shrink_factor
 
     def generator(self, images, labels, img_size, shuffle=True, batch_size=4):
-        dataset        = self.create_tfdata(images, labels, img_size, shuffle, batch_size)
-        iterator       = dataset.make_one_shot_iterator()
+        dataset = self.create_tfdata(images, labels, img_size, shuffle, batch_size)
+        iterator = dataset.make_one_shot_iterator()
         images, labels = iterator.get_next()
+
         return {'input_images': images}, labels
 
     def create_tfdata(self, images, labels, img_size, shuffle=True, batch_size=4):
-        """Define a tf.data.Dataset object, given new images, labels
-        """
+        # for generating ground truth later
+        # swapping width and height
+
         anchors = np.array(self.anchors).astype(np.float32)[:, [1, 0]]
         output_shape = tf.TensorShape([img_size / self.shrink_factor,
                                        img_size / self.shrink_factor,
@@ -95,7 +96,8 @@ class TFData(object):
             # https://www.tensorflow.org/api_docs/python/tf/scatter_n
             feature_map = tf.scatter_nd(indices, values, shape=output_shape)
             # feature_map = tf.SparseTensor(indices, values,output_shape)
-
+            img = tf.cast(img, tf.float32)
+            img.set_shape([img_size, img_size, 3])
             return img, feature_map
 
         dataset = tf.data.Dataset.from_generator(lambda: itertools.izip_longest(images, labels),

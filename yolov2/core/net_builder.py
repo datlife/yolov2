@@ -51,6 +51,7 @@ class YOLOv2MetaArch(object):
             x = self.detector(feature_map, pass_through_layers)
             x = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
                        name='OutputFeatures')(x)
+
             x = OutputInterpreter(anchors=self.anchors,
                                   num_classes=self.num_classes,
                                   name='Predictions')(x)

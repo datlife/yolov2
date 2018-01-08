@@ -9,15 +9,18 @@ In this file, we construct a standard YOLOv2 using Darknet19 as feature extracto
 """
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras.layers import Input
-from tensorflow.python.keras.models import Model
 from sklearn.model_selection import train_test_split
 
-from yolov2.core.loss import YOLOV2Loss
-from yolov2.core.net_builder import YOLOv2MetaArch
+from tensorflow.python.keras.layers import Input
+from tensorflow.python.keras.models import Model
 
 from yolov2.utils.generator import TFData
 from yolov2.utils.parser import parse_inputs, parse_label_map
+
+from yolov2.core.loss import YOLOV2Loss
+from yolov2.core.net_builder import YOLOv2MetaArch
+from yolov2.core.custom_layers import Preprocessor, Reroute, OutputInterpreter
+
 
 K = tf.keras.backend
 
@@ -43,11 +46,7 @@ class YOLOv2(object):
         # Prepare Data  #
         # ###############
         inv_map = {v: k for k, v in self.label_dict.items()}
-        inputs, labels = parse_inputs(training_data, inv_map)
-
-        # we use tf.data.Dataset as a data generator,
-        # Empirically, it runs slower than loading directly into memory
-        # However, it is scalable and can be optimized later
+        filenames, labels = parse_inputs(training_data, inv_map)
         tfdata = TFData(self.num_classes, self.anchors, self.config['model']['shrink_factor'])
 
         # ###############
@@ -67,23 +66,23 @@ class YOLOv2(object):
         # ###############
         # Train model   #
         # ###############
+        model = tf.keras.estimator.model_to_estimator(keras_model=self.model,
+                                                      custom_objects={'Preprocessor': Preprocessor,
+                                                                      'Reroute': Reroute,
+                                                                      'OutputInterpreter': OutputInterpreter})
 
-        with K.get_session() as sess:
-            model = tf.keras.estimator.model_to_estimator(keras_model=self.model)
+        for current_epoch in range(1, epochs+1):
+            # @TODO: Multi-scale training
+            image_size = self.config['model']['image_size']
+            x_train, x_val = train_test_split(filenames, test_size=test_size)
+            y_train = [labels[k] for k in x_train]
+            y_val   = [labels[k] for k in x_val]
 
-            for current_epoch in range(1, epochs+1):
-                # @TODO: Multi-scale training
-                image_size = self.config['model']['image_size']
-                x_train, x_val = train_test_split(inputs, test_size=test_size)
-                y_train = [labels[k] for k in x_train]
-                y_val   = [labels[k] for k in x_val]
+            print("Starting Training...")
+            model.train(input_fn  = lambda: tfdata.generator(x_val, y_val, image_size, batch_size),
+                        steps     = steps_per_epoch)
 
-                print("Starting Training...")
-                model.train(input_fn = lambda: tfdata.generator(x_val, y_val, image_size, batch_size),
-                            steps    = steps_per_epoch)
-
-                # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
-                # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
+            # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
     def evaluate(self, testing_data, summaries=True):
         raise NotImplemented
@@ -95,7 +94,7 @@ class YOLOv2(object):
                                 anchors          = self.anchors,
                                 num_classes      = self.num_classes)
 
-        inputs  = Input(batch_shape=(16, 320, 320, 3), name='input_images')
+        inputs  = Input(shape=(None, None, 3), name='input_images')
         outputs = yolov2.predict(inputs)
         if is_training:
             model = Model(inputs=inputs, outputs=outputs)
