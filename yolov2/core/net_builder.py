@@ -21,65 +21,56 @@ K = tf.keras.backend
 
 
 class YOLOv2MetaArch(object):
-    def __init__(self,
-                 feature_extractor,
-                 detector,
-                 anchors,
-                 num_classes):
-        """
-        YOLOv2 meta architecture, it consists of:
-            * Preprocessor      - a custom Keras layer that pre-process inputs
-            * Feature Extractor - a FeatureExtractor object
-            * Detector          - a Detector Object
-        :param feature_extractor:
-        :param detector:
-        :param anchors:
-        :param num_classes:
-        """
+  def __init__(self,
+               feature_extractor,
+               detector,
+               anchors,
+               num_classes):
+    """
+    YOLOv2 meta architecture, it consists of:
+        * Preprocessor      - a custom Keras layer that pre-process inputs
+        * Feature Extractor - a FeatureExtractor object
+        * Detector          - a Detector Object
+    :param feature_extractor:
+    :param detector:
+    :param anchors:
+    :param num_classes:
+    """
 
-        self.anchors             = anchors
-        self.num_classes         = num_classes
-        self.feature_extractor   = feature_extractor
-        self.detector            = detector
+    self.anchors = anchors
+    self.num_classes = num_classes
+    self.feature_extractor = feature_extractor
+    self.detector = detector
 
-    def predict(self, resized_inputs):
+  def predict(self, resized_inputs):
+    with tf.name_scope('YOLOv2'):
+      feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
 
-        with tf.name_scope('YOLOv2'):
-            # Feature Extractor
-            feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
+      x = self.detector(feature_map, pass_through_layers)
+      x = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
+                 name='OutputFeatures')(x)
 
-            x = self.detector(feature_map, pass_through_layers)
-            x = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
-                       name='OutputFeatures')(x)
+      x = OutputInterpreter(anchors=self.anchors,
+                            num_classes=self.num_classes,
+                            name='Predictions')(x)
+      return x
 
-            x = OutputInterpreter(anchors=self.anchors,
-                                  num_classes=self.num_classes,
-                                  name='Predictions')(x)
-            return x
+  def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
+    """
+    Preform non-max suppression to calculate outputs:
+    Using during evaluation/interference
+    Args:
+        out feature map from network
+    Output:
+       Bounding Boxes - Classes - Probabilities
+    """
 
-    def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
-        """
-        Preform non-max suppression to calculate outputs:
-        Using during evaluation/interference
-        Args:
-            out feature map from network
-        Output:
-           Bounding Boxes - Classes - Probabilities
-        """
+    outputs = PostProcessor(score_threshold=score_threshold,
+                            iou_threshold=iou_threshold,
+                            max_boxes=max_boxes,
+                            name="NonMaxSuppression")(predictions)
 
-        outputs = PostProcessor(score_threshold= score_threshold,
-                                iou_threshold  = iou_threshold,
-                                max_boxes      = max_boxes,
-                                name="NonMaxSuppression")(predictions)
-
-        boxes   = Lambda(lambda x: x[..., :4], name="boxes")(outputs)
-        scores  = Lambda(lambda x: x[..., 4],  name="scores")(outputs)
-        classes = Lambda(lambda x: K.cast(x[..., 5], tf.float32),  name="classes")(outputs)
-        return boxes, classes, scores
-
-    def compute_loss(self, predictions):
-        """
-        Keras does not support loss function during graph construction.
-        A loss function can only be pass during model.compile(loss=loss_func)
-        """
-        raise NotImplemented
+    boxes = Lambda(lambda x: x[..., :4], name="boxes")(outputs)
+    scores = Lambda(lambda x: x[..., 4], name="scores")(outputs)
+    classes = Lambda(lambda x: K.cast(x[..., 5], tf.float32), name="classes")(outputs)
+    return boxes, classes, scores

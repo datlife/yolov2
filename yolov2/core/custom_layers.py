@@ -1,12 +1,18 @@
-import tensorflow as tf
-from tensorflow.python.keras.layers import Layer
+"""Collections of Custom Keras Layers
 
-K = tf.keras.backend
+See: https://keras.io/layers/writing-your-own-keras-layers/
+
+Example usage:
+
+"""
+
+import keras.backend as K
+import tensorflow as tf
+from keras.engine.topology import Layer
 
 
 class ImageResizer(Layer):
-  """
-  Resize image into fixed squared size
+  """Resize image into fixed squared size
   """
 
   def __init__(self, img_size, **kwargs):
@@ -33,7 +39,7 @@ class ImageResizer(Layer):
 
 
 class Preprocessor(Layer):
-  """Pre-process image using a preprocessing function
+  """Pre-process image before loading into feature extractor
   """
 
   def __init__(self, pre_process_func, **kwargs):
@@ -83,6 +89,7 @@ class Reroute(Layer):
     return dict(list(base_config.items()) + list(config.items()))
 
 
+#  @TODO: waiting for Tf.repeat() in upcoming TF version
 class OutputInterpreter(Layer):
   """
   Convert output features into predictions
@@ -99,8 +106,6 @@ class OutputInterpreter(Layer):
   def call(self, output_features, **kwargs):
     shape = tf.shape(output_features)
     batch, height, width = shape[0], shape[1], shape[2]
-
-    #  @TODO: waiting for Tf.repeat() in upcoming TF version
 
     # ##################
     #  Create offset map
@@ -163,8 +168,12 @@ class PostProcessor(Layer):
     self.iou_threshold = iou_threshold
     self.score_threshold = score_threshold
 
+    super(PostProcessor, self).__init__(**kwargs)
+
+
   def build(self, input_shape):
     super(PostProcessor, self).build(input_shape)
+
 
   def call(self, inputs, **kwargs):
     boxes = inputs[..., 0:4]
@@ -189,8 +198,10 @@ class PostProcessor(Layer):
 
     return K.concatenate([boxes, K.cast(classes, tf.float32), scores])
 
+
   def compute_output_shape(self, input_shape):
     return [(None, 6)]
+
 
   def get_config(self):
     config = {'score_threshold': self.score_threshold,
