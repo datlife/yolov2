@@ -13,7 +13,6 @@ class YOLOV2Loss(object):
     self.summary = summary
 
   def compute_loss(self, y_true, y_pred):
-
     output_dims = tf.shape(y_pred)
     height = output_dims[1]
     width = output_dims[2]

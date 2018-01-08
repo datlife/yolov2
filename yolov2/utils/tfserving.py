@@ -1,17 +1,16 @@
 """
 Tensorflow Serving libraries
 """
-from __future__ import print_function
 from __future__ import absolute_import
+from __future__ import print_function
 
 import os
-import time
 import signal
 import subprocess
+import time
 
 import numpy as np
 import tensorflow as tf
-
 # TensorFlow serving python API to send messages to server
 from grpc.beta import implementations
 from tensorflow_serving.apis import predict_pb2

@@ -1,10 +1,12 @@
+
 import cv2
 import itertools
+import keras.backend as K
 import numpy as np
 import tensorflow as tf
-import keras.backend as K
-from ..core.ops import iou
+
 from ..core.ops import find_and_solve_collided_indices
+from ..core.ops import iou
 
 
 class TFData(object):

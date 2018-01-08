@@ -1,10 +1,18 @@
-import tensorflow as tf
+"""Collections of Custom Keras Layers
+
+See: https://keras.io/layers/writing-your-own-keras-layers/
+
+Example usage:
+
+"""
+
 import keras.backend as K
+import tensorflow as tf
 from keras.engine.topology import Layer
 
 
 class ImageResizer(Layer):
-  """Resize image into fixed squared size before loading into feature extractor
+  """Resize image into fixed squared size
   """
 
   def __init__(self, img_size, **kwargs):
@@ -50,7 +58,6 @@ class Preprocessor(Layer):
 
   def get_config(self):
     config = {'pre_process_func': self.pre_process_func}
-
     base_config = super(Preprocessor, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))
 
@@ -82,19 +89,91 @@ class Reroute(Layer):
     return dict(list(base_config.items()) + list(config.items()))
 
 
+#  @TODO: waiting for Tf.repeat() in upcoming TF version
+class OutputInterpreter(Layer):
+  """
+  Convert output features into predictions
+  """
+
+  def __init__(self, anchors, num_classes, **kwargs):
+    super(OutputInterpreter, self).__init__(**kwargs)
+    self.anchors = anchors
+    self.num_classes = num_classes
+
+  def build(self, input_shape):
+    super(OutputInterpreter, self).build(input_shape)
+
+  def call(self, output_features, **kwargs):
+    shape = tf.shape(output_features)
+    batch, height, width = shape[0], shape[1], shape[2]
+
+    # ##################
+    #  Create offset map
+    # ##################
+    cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
+    cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
+    cy = tf.reshape(cy, [-1, height, width, 1])
+    c_xy = tf.to_float(tf.stack([cx, cy], -1))
+    # c_xy = tf.reshape(c_xy, [1, 1, 1, tf.shape(c_xy)[0], tf.shape(c_xy)[1]])
+    anchors_tensor = tf.to_float(K.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]))
+    output_size = tf.to_float(K.reshape([width, height], [1, 1, 1, 1, 2]))
+
+    outputs = K.reshape(output_features, [batch, height, width, len(self.anchors), self.num_classes + 5])
+
+    # ##################
+    # Interpret outputs
+    # ##################
+    #  (Ref: YOLO-9000 paper)
+    box_xy = K.sigmoid(outputs[..., 0:2]) + c_xy
+    box_wh = K.exp(outputs[..., 2:4]) * anchors_tensor
+    box_confidence = K.sigmoid(outputs[..., 4:5])
+    box_class_probs = K.softmax(outputs[..., 5:])
+
+    # Convert coordinates to relative coordinates (percentage)
+    box_xy = box_xy / output_size
+    box_wh = box_wh / output_size
+
+    # Calculate corner points of bounding boxes
+    box_mins = box_xy - (box_wh / 2.)
+    box_maxes = box_xy + (box_wh / 2.)
+
+    # Y1, X1, Y2, X2
+    boxes = K.concatenate([box_mins[..., 1:2],
+                           box_mins[..., 0:1],  # Y1 X1
+                           box_maxes[..., 1:2],
+                           box_maxes[..., 0:1]], axis=-1)  # Y2 X2
+
+    outputs = K.concatenate([boxes, box_confidence, box_class_probs], axis=-1)
+    return outputs
+
+  def compute_output_shape(self, input_shape):
+    return tuple([input_shape[0], input_shape[1], input_shape[2], len(self.anchors), 5 + self.num_classes])
+
+  def get_config(self):
+    config = {'anchors': self.anchors,
+              'num_classes': self.num_classes}
+    base_config = super(OutputInterpreter, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+
 class PostProcessor(Layer):
-  """Perform Non-Max Suppression to calculate prediction
+  """
+  Perform Non-Max Suppression to calculate prediction
   """
 
   def __init__(self, score_threshold, iou_threshold, max_boxes=1000, **kwargs):
+    super(PostProcessor, self).__init__(**kwargs)
+
     self.max_boxes = max_boxes
     self.iou_threshold = iou_threshold
     self.score_threshold = score_threshold
 
     super(PostProcessor, self).__init__(**kwargs)
 
+
   def build(self, input_shape):
     super(PostProcessor, self).build(input_shape)
+
 
   def call(self, inputs, **kwargs):
     boxes = inputs[..., 0:4]
@@ -119,8 +198,10 @@ class PostProcessor(Layer):
 
     return K.concatenate([boxes, K.cast(classes, tf.float32), scores])
 
+
   def compute_output_shape(self, input_shape):
     return [(None, 6)]
+
 
   def get_config(self):
     config = {'score_threshold': self.score_threshold,

@@ -8,22 +8,24 @@ and different types of detector, too.
 In this file, we construct a standard YOLOv2 using Darknet19 as feature extractor.
 """
 import os
-import numpy as np
-import tensorflow as tf
-from sklearn.model_selection import train_test_split
 
 import keras
-import keras.backend as K
+import numpy as np
+import tensorflow as tf
 from keras.layers import Input
 from keras.models import Model
+from sklearn.model_selection import train_test_split
 
 from yolov2.core.loss import YOLOV2Loss
 from yolov2.core.net_builder import YOLOv2MetaArch
-
 from yolov2.utils.generator import TFData
 from yolov2.utils.parser import parse_inputs, parse_label_map
 from yolov2.utils.tensorboard import TensorBoard
 
+
+# @TODO: Multi-scale training
+# @TODO: add  ClassificationLoss, Localization, ObjectConfidence
+# @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 
 class YOLOv2(object):
 
@@ -32,12 +34,11 @@ class YOLOv2(object):
     self.config = config_dict
     self.is_training = is_training
 
-    # @TODO: remove 608.
-    self.anchors = np.array(config_dict['anchors']) / (608. / 32)
+    self.anchors     = np.array(config_dict['anchors'])
     self.num_classes = config_dict['model']['num_classes']
-    self.label_dict = parse_label_map(config_dict['label_map'])
+    self.label_dict  = parse_label_map(config_dict['label_map'])
 
-    self.model = self._construct_model(is_training, feature_extractor, detector)
+    self.model   = self._construct_model(is_training, feature_extractor, detector)
     self.summary = add_summaries
 
   def train(self, training_data, epochs, steps_per_epoch, batch_size, learning_rate, test_size=0.2):
@@ -73,14 +74,15 @@ class YOLOv2(object):
       save_best_only=True,
       save_weights_only=True)
     for current_epoch in range(epochs):
-      # @TODO: Multi-scale training
-      image_size = self.config['model']['image_size']
 
+      image_size = self.config['model']['image_size']
       x_train, x_val = train_test_split(inputs, test_size=test_size)
       y_train = [labels[k] for k in x_train]
       y_val = [labels[k] for k in x_val]
 
-      val_images, val_labels = tfdata.generator(x_val, y_val, image_size, batch_size=batch_size * 20).next()
+      val_images, val_labels = tfdata.generator(
+        x_val, y_val, image_size, batch_size=batch_size * 20).next()
+
       self.model.fit_generator(
         generator=tfdata.generator(x_train, y_train, image_size, batch_size),
         steps_per_epoch=1000,
@@ -92,10 +94,6 @@ class YOLOv2(object):
         verbose=1,
         workers=0)
 
-      # @TODO: Summaries to TensorBoard
-      # @TODO: add  ClassificationLoss, Localization, ObjectConfidence
-      # @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
-
   def _construct_model(self, is_training, feature_extractor, detector):
 
     yolov2 = YOLOv2MetaArch(feature_extractor=feature_extractor,
@@ -103,7 +101,7 @@ class YOLOv2(object):
                             anchors=self.anchors,
                             num_classes=self.num_classes)
 
-    inputs = Input(shape=(None, None, 3), name='input_images')
+    inputs  = Input(shape=(None, None, 3), name='input_images')
     outputs = yolov2.predict(inputs)
     if is_training:
       model = Model(inputs=inputs, outputs=outputs)
@@ -113,9 +111,7 @@ class YOLOv2(object):
                                     deploy_params['iou_threshold'],
                                     deploy_params['score_threshold'],
                                     deploy_params['maximum_boxes'])
-
       model = Model(inputs=inputs, outputs=outputs)
-
     model.load_weights(self.config['model']['weight_file'])
     print("Weight file has been loaded in to model")
 

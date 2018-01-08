@@ -2,13 +2,13 @@
 DarKNet 19 Architecture
 """
 import tensorflow as tf
-from keras.models import Model
-from keras.layers import Conv2D
-from keras.layers import MaxPool2D
-from keras.layers import BatchNormalization, Activation
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers import GlobalAvgPool2D
-from keras.regularizers import l2
+from tensorflow.python.keras.layers import BatchNormalization, Activation
+from tensorflow.python.keras.layers import Conv2D
+from tensorflow.python.keras.layers import GlobalAvgPool2D
+from tensorflow.python.keras.layers import LeakyReLU
+from tensorflow.python.keras.layers import MaxPool2D
+from tensorflow.python.keras.models import Model
+
 from ..custom_layers import Preprocessor
 
 
@@ -71,6 +71,7 @@ def darknet19(inputs, num_classes=1000, include_top=False):
       x = Model(inputs, x)
 
   return x, pass_through_layers
+
 
 
 def conv_block(x, filters, kernel_size, name=None):

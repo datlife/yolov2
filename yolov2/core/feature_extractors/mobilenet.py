@@ -3,15 +3,17 @@ MobileNet Implementation in Keras
 
 Author: https://github.com/fchollet/keras/blob/master/keras/applications/mobilenet.py
 """
-import keras.backend as K
-from keras.layers import InputSpec
-from keras.layers import Conv2D
-from keras.layers import BatchNormalization
-from keras.layers import Activation
-from keras.layers import GlobalAvgPool2D, Reshape, Dropout
-from keras.models import Model
-from keras import initializers, regularizers, constraints
+import tensorflow as tf
+from tensorflow.python.keras.layers import InputSpec
+from tensorflow.python.keras.layers import Conv2D
+from tensorflow.python.keras.layers import BatchNormalization
+from tensorflow.python.keras.layers import Activation
+from tensorflow.python.keras.layers import GlobalAvgPool2D, Reshape, Dropout
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras import initializers, regularizers, constraints
 from keras.utils import conv_utils
+
+K = tf.keras.backend
 
 
 def mobilenet_preprocces_func(x):

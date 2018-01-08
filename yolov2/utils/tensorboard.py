@@ -1,7 +1,6 @@
-import os
+import keras.backend as K
 import tensorflow as tf
 from keras.callbacks import Callback
-import keras.backend as K
 
 
 class TensorBoard(Callback):

@@ -1,6 +1,7 @@
 import csv
-import numpy as np
 from itertools import islice
+
+import numpy as np
 
 
 def parse_inputs(filename, label_dict):
