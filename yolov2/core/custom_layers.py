@@ -1,10 +1,18 @@
+"""Collections of Custom Keras Layers
+
+See: https://keras.io/layers/writing-your-own-keras-layers/
+
+Example usage:
+
+"""
+
 import keras.backend as K
 import tensorflow as tf
 from keras.engine.topology import Layer
 
 
 class ImageResizer(Layer):
-  """Resize image into fixed squared size before loading into feature extractor
+  """Resize image into fixed squared size
   """
 
   def __init__(self, img_size, **kwargs):
