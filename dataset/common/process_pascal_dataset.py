@@ -33,7 +33,7 @@ https://github.com/tensorflow/models/blob/master/object_detection/create_pascal_
 """
 import os
 from lxml import etree
-from dataset_utils import recursive_parse_xml_to_dict
+from dataset_utils import recursive_parse_xml_to_dict, read_examples_list
 import tensorflow as tf
 
 
@@ -68,7 +68,6 @@ def main(_):
 
         for year in years:
             annotations_dir = os.path.join(data_dir, year, FLAGS.annotations_dir)
-
             examples_path   = os.path.join(data_dir, year, 'ImageSets', 'Main', 'aeroplane_' + FLAGS.set + '.txt')
             examples_list   = read_examples_list(examples_path)
 
@@ -97,6 +96,7 @@ def main(_):
                     txt_file.write(instance)
 
         print('Total instances', items)
+
 
 if __name__ == '__main__':
     tf.app.run()

@@ -24,9 +24,6 @@ from yolov2.utils.parser import parse_inputs, parse_label_map
 
 K = tf.keras.backend
 
-# @TODO: Multi-scale training
-# @TODO: add  ClassificationLoss, Localization, ObjectConfidence
-# @TODO: add 10 samples images and draw bounding boxes + ground truths using IoU = 0.5, scores=0.7
 custom_objects = {
   'Preprocessor': Preprocessor,
   'PostProcessor': PostProcessor,
@@ -84,12 +81,12 @@ class YOLOv2(object):
     # ################
     # Start training #
     # ################
-    multi_scale_img_sizes = np.array(self.config['model']['image_size'])
+    img_sizes = np.array(self.config['model']['image_size'])
     tfdata = TFData(self.num_classes, self.anchors, self.config['model']['shrink_factor'])
     for i in range(epochs):
       x_train, x_val = train_test_split(inputs, test_size=test_size, shuffle=True)
       y_train  = [labels[k] for k in x_train]
-      img_size = random.choice(multi_scale_img_sizes)
+      img_size = random.choice(img_sizes)
 
       train_gen = tfdata.generator(x_train, y_train, img_size, batch_size, shuffle=True)
       for step in range(steps_per_epoch):
@@ -100,18 +97,12 @@ class YOLOv2(object):
       y_val    = [labels[k] for k in x_val]
       val_gen   = tfdata.generator(x_val, y_val, img_size, batch_size, shuffle=True)
 
-
   def _construct_model(self, is_training, feature_extractor, detector):
-    init_weights = None
-    if 'based' in self.config['model']['weight_file']:
-      init_weights = self.config['model']['weight_file']
-
     yolov2 = YOLOv2MetaArch(
                feature_extractor=feature_extractor,
                detector=detector,
                anchors=self.anchors,
-               num_classes=self.num_classes,
-               init_weights= init_weights)
+               num_classes=self.num_classes)
 
     inputs  = Input(shape=(None, None, 3), name='input_images')
     outputs = yolov2.predict(inputs)
@@ -127,8 +118,7 @@ class YOLOv2(object):
 
       model = Model(inputs=inputs, outputs=outputs)
 
-    if init_weights:
-      model.load_weights(self.config['model']['weight_file'])
+    model.load_weights(self.config['model']['weight_file'])
     print("Weight file has been loaded in to model")
     return model
 
