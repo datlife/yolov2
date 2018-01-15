@@ -1,3 +1,4 @@
+import re
 import csv
 from itertools import islice
 
@@ -45,22 +46,24 @@ def parse_inputs(filename, label_dict):
   return inputs, labels
 
 
-def parse_label_map(map_file):
-  """Create a label map dictionary
-
+def parse_label_map(label_map_path):
+  """Parse label map file into a dictionary
   Args:
-    map_file:
+    label_map_path:
 
   Returns:
-
+    a dictionary : key: obj_id value: obj-name
   """
-  try:
-    with open(map_file, mode='r') as txt_file:
-      class_names = [c.strip() for c in txt_file.readlines()]
+  # match any group having language of {id:[number] .. name:'name'}
+  parser = re.compile(r'id:[^\d]*(?P<id>[0-9]+)\s+name:[^\']*\'(?P<name>[\w_-]+)\'')
 
-    label_dict = {v: k for v, k in enumerate(class_names)}
-    return label_dict
+  with open(label_map_path, 'r') as f:
+    lines = f.read().splitlines()
+    lines = ''.join(lines)
 
-  except IOError as e:
-    print("\nPlease check config.py file")
-    raise (e)
+    # a tuple (id, name)
+    result = parser.findall(lines)
+    label_map_dict = {item[0]: item[1] for item in result}
+
+    return label_map_dict
+

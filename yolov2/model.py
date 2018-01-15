@@ -7,6 +7,7 @@ and different types of detector, too.
 
 In this file, we construct a standard YOLOv2 using Darknet19 as feature extractor.
 """
+import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras.layers import Input
@@ -16,7 +17,6 @@ from sklearn.model_selection import train_test_split
 from yolov2.core.loss import YOLOV2Loss
 from yolov2.core.estimator import get_estimator
 from yolov2.core.net_builder import YOLOv2MetaArch
-
 from yolov2.core.custom_layers import Preprocessor, PostProcessor, OutputInterpreter
 
 from yolov2.utils.generator import TFData
@@ -55,62 +55,51 @@ class YOLOv2(object):
     self.model   = self._construct_model(is_training, feature_extractor, detector)
 
   def train(self, training_data, epochs, steps_per_epoch, batch_size, learning_rate, test_size=0.2):
+    """
 
+    Args:
+      training_data:
+      epochs:
+      steps_per_epoch:
+      batch_size:
+      learning_rate:
+      test_size:
+
+    Returns:
+
+    """
     # ###############
     # Prepare Data  #
     # ###############
-    image_size = self.config['model']['image_size']
-
-    inv_map = {v: k for k, v in self.label_dict.items()}
-    inputs, labels = parse_inputs(training_data, inv_map)
-
-    x_train, x_val = train_test_split(inputs, test_size=test_size)
-    y_train = [labels[k] for k in x_train]
-    y_val   = [labels[k] for k in x_val]
-
-    tfdata = TFData(
-      num_classes   = self.num_classes,
-      anchors       = self.anchors,
-      shrink_factor = self.config['model']['shrink_factor'])
+    inverse_dict = {v: k for k, v in self.label_dict.items()}
+    inputs, labels = parse_inputs(training_data, inverse_dict)
 
     # ################
     # Compile model  #
     # ################
-    objective = YOLOV2Loss(self.anchors, self.num_classes, summary=True)
-    self.model.compile(optimizer=tf.keras.optimizers.Adam(lr=learning_rate),
-                       loss=objective.compute_loss)
-    # ############################
-    # Convert Keras to Estimator #
-    # ############################
-    # Note: there might be a better solution. I converted to tf.Estimator,
-    # instead of using model.fit_generator, so that I can gain more flexibility
-    # to play with Tensorboard for visualization purposes
-    config = tf.estimator.RunConfig(
-      model_dir=None,
-      save_summary_steps=20,
-      log_step_count_steps=20,
-      save_checkpoints_steps=steps_per_epoch,
-    )
-    estimator = get_estimator(
-      model          = self.model,
-      custom_objects = custom_objects,
-      config         = config,
-      params         = self.config,
-      label_map      = self.label_dict)
+    objective = YOLOV2Loss(self.anchors, self.num_classes)
+    self.model.compile(optimizer= tf.keras.optimizers.Adam(lr=learning_rate),
+                       loss     = objective.compute_loss)
 
-    train_spec = tf.estimator.TrainSpec(
-      input_fn=lambda: tfdata.generator(x_train, y_train, image_size, batch_size),
-      max_steps= steps_per_epoch*epochs,
-    )
-    eval_spec = tf.estimator.EvalSpec(
-      input_fn=lambda: tfdata.generator(x_val, y_val, image_size, batch_size),
-      throttle_secs= 500,
-      steps=1
-    )
     # ################
-    # Start Training #
+    # Start training #
     # ################
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    multi_scale_img_sizes = np.array(self.config['model']['image_size'])
+    tfdata = TFData(self.num_classes, self.anchors, self.config['model']['shrink_factor'])
+    for i in range(epochs):
+      x_train, x_val = train_test_split(inputs, test_size=test_size, shuffle=True)
+      y_train  = [labels[k] for k in x_train]
+      img_size = random.choice(multi_scale_img_sizes)
+
+      train_gen = tfdata.generator(x_train, y_train, img_size, batch_size, shuffle=True)
+      for step in range(steps_per_epoch):
+        x_batch, y_batch = train_gen.next()
+        loss = self.model.train_on_batch(x_batch, y_batch)
+
+      # Eval
+      y_val    = [labels[k] for k in x_val]
+      val_gen   = tfdata.generator(x_val, y_val, img_size, batch_size, shuffle=True)
+
 
   def _construct_model(self, is_training, feature_extractor, detector):
     init_weights = None
@@ -143,19 +132,19 @@ class YOLOv2(object):
     print("Weight file has been loaded in to model")
     return model
 
-
-# #
-# # ########################
-# # Start Training Process #
-# # ########################
-# model.train(
-#   input_fn= lambda: tfdata.generator(x_train, y_train, image_size, batch_size),
-#   hooks = None,
-#   steps = steps_per_epoch
+# ############################
+# Convert Keras to Estimator #
+# ############################
+# config = tf.estimator.RunConfig(
+#   model_dir=None,
+#   save_summary_steps=20,
+#   log_step_count_steps=20,
+#   save_checkpoints_steps=steps_per_epoch,
 # )
 #
-# model.evaluate(
-#   input_fn= lambda: tfdata.generator(x_val, y_val, image_size, batch_size),
-#   hooks = None,
-#   steps = int(len(x_val)/batch_size)
-# )
+# estimator = get_estimator(
+#   model=self.model,
+#   custom_objects=custom_objects,
+#   config=config,
+#   params=self.config,
+#   label_map=self.label_dict)

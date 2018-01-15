@@ -5,11 +5,11 @@ from ..custom_layers import Reroute
 from ..feature_extractors.darknet19 import conv_block
 
 
+# @TODO : create a loop for fine_grained layers
 def yolov2_detector(feature_map,
                     fine_grained_layers):
   """ Original YOLOv2 Implementation
   """
-  # @TODO : create a loop for fine_grained layers
   layer = fine_grained_layers[0]
   with tf.name_scope("Detector"):
     x = conv_block(feature_map, 1024, (3, 3), name="DetectConv2d_1")

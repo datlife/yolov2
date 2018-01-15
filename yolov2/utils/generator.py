@@ -34,7 +34,6 @@ class TFData(object):
 
   def create_tfdata(self, file_names, labels, img_size, batch_size=4, shuffle=True):
     """Create `dataset` object for training
-
     Args:
       file_names:
       labels:
@@ -76,11 +75,9 @@ class TFData(object):
   def __read_img(self, img_size):
     def __read_img_file(filename, label):
       """Load image into memory and convert bboxes into relative size
-
       Args:
         filename:
         label:
-
       Returns:
 
       """
