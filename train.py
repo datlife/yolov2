@@ -17,12 +17,15 @@ Return
 
 """
 import yaml
+import tensorflow as tf
 from argparse import ArgumentParser
 
 # In this file, we construct the original YOLOv2 model
 from yolov2.model import YOLOv2
 from yolov2.core.feature_extractors import darknet19
 from yolov2.core.detectors import yolov2_detector
+
+tf.logging.set_verbosity(tf.logging.DEBUG)
 
 
 def _main_():

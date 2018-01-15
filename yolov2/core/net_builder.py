@@ -14,8 +14,8 @@ import tensorflow as tf
 
 from tensorflow.python.keras.layers import Conv2D
 from tensorflow.python.keras.layers import Lambda
-from tensorflow.python.keras.regularizers import l2
 from .custom_layers import PostProcessor, OutputInterpreter
+# from tensorflow.python.keras.regularizers import l2
 
 K = tf.keras.backend
 
@@ -25,7 +25,8 @@ class YOLOv2MetaArch(object):
                feature_extractor,
                detector,
                anchors,
-               num_classes):
+               num_classes,
+               init_weights=None):
     """
     YOLOv2 meta architecture, it consists of:
         * Preprocessor      - a custom Keras layer that pre-process inputs
@@ -41,12 +42,17 @@ class YOLOv2MetaArch(object):
     self.num_classes = num_classes
     self.feature_extractor = feature_extractor
     self.detector = detector
+    self.init_weights =init_weights
 
   def predict(self, resized_inputs):
     with tf.name_scope('YOLOv2'):
       feature_map, pass_through_layers = self.feature_extractor(resized_inputs)
 
       x = self.detector(feature_map, pass_through_layers)
+      if self.init_weights:
+        model = tf.keras.models.Model(resized_inputs, x).load_weights(self.init_weights)
+        x = model.outputs
+
       x = Conv2D(len(self.anchors) * (self.num_classes + 5), (1, 1),
                  name='OutputFeatures')(x)
 
@@ -55,7 +61,8 @@ class YOLOv2MetaArch(object):
                             name='Predictions')(x)
       return x
 
-  def post_process(self, predictions, iou_threshold, score_threshold, max_boxes=100):
+  @staticmethod
+  def post_process(predictions, iou_threshold, score_threshold, max_boxes=100):
     """
     Preform non-max suppression to calculate outputs:
     Using during evaluation/interference
