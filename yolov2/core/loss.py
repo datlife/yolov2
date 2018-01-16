@@ -2,7 +2,6 @@
 Loss (Objective) Function definition for You Only Look Once version 2
 """
 import tensorflow as tf
-
 EPSILON = 1e-8
 
 class YOLOV2Loss(object):
@@ -39,24 +38,22 @@ class YOLOV2Loss(object):
       gt_centroids = gt_boxes[..., 0:2] + (gt_wh / 2.0)
       pred_centroids = pred_boxes[..., 0:2] + (pred_wh / 2.0)
 
-      #  Create offset grid
-      cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
-      cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
-      cy = tf.reshape(cy, [-1, height, width, 1])
-
-      grid_centroids = 0.5 + tf.to_float(tf.stack([cx, cy], -1))
-      grid_anchors = tf.cast(tf.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]), tf.float32)
-
       # For cells containing objects, we penalize the difference between ground truths and predictions
       obj_coord = obj_cells * (tf.square(pred_centroids - gt_centroids) +
                                tf.square(tf.sqrt(pred_wh) - tf.sqrt(gt_wh)))
-
+      obj_coord = tf.reduce_sum(obj_coord) / (num_objects + EPSILON)
       # For cells containing no objects, we penalize the difference between predictions
       # and the centroids + anchors of that cells
+      #  Create an offset map (Ref: YOLO9000)
+      cx = tf.reshape(tf.tile(tf.range(width), [height]), [-1, height, width, 1])
+      cy = tf.tile(tf.expand_dims(tf.range(height), -1), [1, width])
+      cy = tf.reshape(cy, [-1, height, width, 1])
+      grid_centroids = 0.5 + tf.to_float(tf.stack([cx, cy], -1))
+      grid_anchors = tf.cast(tf.reshape(self.anchors, [1, 1, 1, len(self.anchors), 2]), tf.float32)
+
       no_obj_coord = noobj_cells * (tf.square(pred_centroids - grid_centroids) +
-                                    tf.square(tf.sqrt(pred_wh) - tf.sqrt(tf.ones_like(pred_wh) * grid_anchors)))
-      # Average out
-      obj_coord = tf.reduce_sum(obj_coord) / (num_objects + EPSILON)
+                                    tf.square(tf.sqrt(pred_wh) -
+                                              tf.sqrt(grid_anchors * tf.ones_like(pred_wh))))
       no_obj_coord = tf.reduce_sum(no_obj_coord) / (num_no_objects + EPSILON)
 
       coord_loss = 5.0 * obj_coord + 0.01 * no_obj_coord
@@ -64,11 +61,12 @@ class YOLOV2Loss(object):
     with tf.name_scope('ObjectConfidenceLoss'):
       box_iou = self.compute_iou(gt_boxes, pred_boxes)
       best_iou = tf.expand_dims(tf.reduce_max(box_iou, axis=-1), -1)
-
       obj_conf = obj_cells * tf.expand_dims(tf.square(pred_conf - gt_conf * box_iou), -1)
-      no_obj_conf = noobj_cells * tf.expand_dims(tf.square(pred_conf - 0.0) * tf.to_float(best_iou < 0.6), -1)
       obj_conf = tf.reduce_sum(obj_conf) / (num_objects + EPSILON)
+
+      no_obj_conf = noobj_cells * tf.expand_dims(tf.square(pred_conf - 0.0) * tf.to_float(best_iou < 0.6), -1)
       no_obj_conf = tf.reduce_sum(no_obj_conf) / (num_no_objects + EPSILON)
+
       conf_loss = 1.0 * obj_conf + 0.01 * no_obj_conf
 
     # # @TODO: focal loss
@@ -81,12 +79,12 @@ class YOLOV2Loss(object):
       total_loss = coord_loss + conf_loss + cls_loss
 
     if self.summary:
-      tf.summary.scalar("total_loss", total_loss)
+      tf.summary.scalar("total_loss",  total_loss)
       tf.summary.scalar("regression_loss", coord_loss)
       tf.summary.scalar("object_confidence_loss", obj_conf)
       tf.summary.scalar("classification_loss", cls_loss)
-      # tf.summary.scalar("AverageIOU", tf.reduce_mean((obj_cells * box_iou) / (num_objects + EPSILON)))
-      # tf.summary.scalar("Recall", tf.reduce_sum(tf.to_float(box_iou > 0.5)))
+      tf.summary.scalar("average_iou", tf.reduce_sum((obj_cells * tf.expand_dims(box_iou,-1)) / (num_objects + EPSILON)))
+      tf.summary.scalar("recall", tf.reduce_sum(tf.to_float(box_iou > 0.6)))
 
     return total_loss
 
@@ -97,7 +95,6 @@ class YOLOV2Loss(object):
         pr_wh   = pred_boxes[..., 2:4] - pred_boxes[..., 0:2]
         gt_area = gt_wh[..., 0] * gt_wh[..., 1]
         pr_area = pr_wh[..., 0] * pr_wh[..., 1]
-
       with tf.name_scope('Intersections'):
         intersect_mins = tf.maximum(gt_boxes[..., 0:2], pred_boxes[..., 0:2])
         intersect_maxes = tf.minimum(gt_boxes[..., 2:4], pred_boxes[..., 2:4])
@@ -105,9 +102,6 @@ class YOLOV2Loss(object):
         intersections = intersect_hw[..., 0] * intersect_hw[..., 1]
       with tf.name_scope("Unions"):
         unions = gt_area + pr_area - intersections
-
-      iou = tf.where(tf.equal(intersections, 0.0),
+      return tf.where(tf.equal(intersections, 0.0),
                      tf.zeros_like(intersections),
                      tf.truediv(intersections, unions))
-
-      return iou

@@ -17,29 +17,33 @@ Return
 
 """
 import yaml
+import tensorflow as tf
 from argparse import ArgumentParser
 
-# In this file, we construct the original YOLOv2 model
 from yolov2.model import YOLOv2
 from yolov2.core.feature_extractors import darknet19
 from yolov2.core.detectors import yolov2_detector
+
+tf.logging.set_verbosity(tf.logging.DEBUG)
 
 
 def _main_():
     parser = ArgumentParser(description="Train YOLOv2")
     parser.add_argument('--csv_file', type=str, default=None,
                         help="Path to CSV training data set")
+
     parser.add_argument('--config', type=str, default=None,
                         help="Path to config file")
     # PARSE CONFIG
     args = parser.parse_args()
     cfg  = yaml.load(open(args.config, 'r'))
 
-    # Define Keras Model
+    # Construct YOLOv2 model
     detector = YOLOv2(is_training=True,
                       feature_extractor=darknet19,
                       detector=yolov2_detector,
                       config_dict=cfg)
+
     # Start training
     training_cfg  = cfg['training_params']
     detector.train(training_data = args.csv_file,

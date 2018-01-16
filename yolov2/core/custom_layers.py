@@ -5,10 +5,9 @@ See: https://keras.io/layers/writing-your-own-keras-layers/
 Example usage:
 
 """
-
-import keras.backend as K
 import tensorflow as tf
-from keras.engine.topology import Layer
+from tensorflow.python.keras.layers import Layer
+K = tf.keras.backend
 
 
 class ImageResizer(Layer):
@@ -127,7 +126,9 @@ class OutputInterpreter(Layer):
     box_xy = K.sigmoid(outputs[..., 0:2]) + c_xy
     box_wh = K.exp(outputs[..., 2:4]) * anchors_tensor
     box_confidence = K.sigmoid(outputs[..., 4:5])
-    box_class_probs = K.softmax(outputs[..., 5:])
+    # box_class_probs = K.softmax(outputs[..., 5:])
+    # Disabled for compatability tf.softmax_with_logits
+    box_class_probs = outputs[..., 5:]
 
     # Convert coordinates to relative coordinates (percentage)
     box_xy = box_xy / output_size
@@ -168,12 +169,8 @@ class PostProcessor(Layer):
     self.iou_threshold = iou_threshold
     self.score_threshold = score_threshold
 
-    super(PostProcessor, self).__init__(**kwargs)
-
-
   def build(self, input_shape):
     super(PostProcessor, self).build(input_shape)
-
 
   def call(self, inputs, **kwargs):
     boxes = inputs[..., 0:4]
@@ -198,10 +195,8 @@ class PostProcessor(Layer):
 
     return K.concatenate([boxes, K.cast(classes, tf.float32), scores])
 
-
   def compute_output_shape(self, input_shape):
     return [(None, 6)]
-
 
   def get_config(self):
     config = {'score_threshold': self.score_threshold,
