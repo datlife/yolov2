@@ -34,11 +34,11 @@ def main():
     with open('config.yml', 'r') as stream:
         config = yaml.load(stream)
 
-    interference = config['interference']
+    inference = config['inference']
     label_dict = parse_label_map(config['label_map'])
     model_name = config['model']['name']
     model_path = os.path.join(config['deploy_params']['output_path'], model_name)
-    server     = interference['server']
+    server     = inference['server']
 
     # #####################
     # Init Detection Server
@@ -57,13 +57,13 @@ def main():
         # ################
         object_detector = DetectionClient(server, model_name, label_dict, verbose=True)
         video_capture   = WebcamVideoStream(ARGS.video_source,
-                                            width=interference['frame_width'],
-                                            height=interference['frame_height']).start()
+                                            width=inference['frame_width'],
+                                            height=inference['frame_height']).start()
 
         # ##########
         # Start Demo
         # ###########
-        viewer = WebCamViewer(video_capture, object_detector, score_threshold=interference['score_threshold'])
+        viewer = WebCamViewer(video_capture, object_detector, score_threshold=inference['score_threshold'])
         viewer.run()
 
         # ############

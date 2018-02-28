@@ -38,9 +38,9 @@ deploy_params:
   score_threshold:  0.0
 
 ###########################
-# Interference Parameters #
+# inference Parameters #
 ###########################
-interference:
+inference:
   server:          localhost:9000
   frame_width:     480
   frame_height:    640

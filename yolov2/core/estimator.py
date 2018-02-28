@@ -63,12 +63,12 @@ def _construct_model_fn(model,  custom_objects, label_map):
         iou_threshold  = 0.5,
         score_threshold= 0.0,
         max_boxes      = 100)
-      interference = tf.keras.models.Model(model.inputs, outputs)
-      interference = _clone_and_build_model(mode, interference, custom_objects, features, labels)
+      inference = tf.keras.models.Model(model.inputs, outputs)
+      inference = _clone_and_build_model(mode, inference, custom_objects, features, labels)
       predictions = {
-        'detection_boxes': tf.identity(interference.outputs[0], name='detection_boxes'),
-        'detection_scores': tf.identity(interference.outputs[1], name='detection_scores'),
-        'detection_classes': tf.identity(interference.outputs[2], name='detection_classes')
+        'detection_boxes': tf.identity(inference.outputs[0], name='detection_boxes'),
+        'detection_scores': tf.identity(inference.outputs[1], name='detection_scores'),
+        'detection_classes': tf.identity(inference.outputs[2], name='detection_classes')
       }
       return tf.estimator.EstimatorSpec(
          mode = mode,

@@ -65,7 +65,7 @@ class YOLOv2MetaArch(object):
   def post_process(predictions, iou_threshold, score_threshold, max_boxes=100):
     """
     Preform non-max suppression to calculate outputs:
-    Using during evaluation/interference
+    Using during evaluation/inference
     Args:
         out feature map from network
     Output:

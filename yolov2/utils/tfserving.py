@@ -67,7 +67,7 @@ class DetectionClient(object):
 
 
 class DetectionServer(object):
-  """Manage detection TF Server for interference
+  """Manage detection TF Server for inference
 
   This object will manage turning on/off server
   """

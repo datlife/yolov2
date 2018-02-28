@@ -1,10 +1,10 @@
 """
-Export and Optimize your trained YOLOv2 for interference.
+Export and Optimize your trained YOLOv2 for inference.
 
 This file will:
     * Reconstruct a clean TF graph
     * Load the trained weights
-    * Quantize/Optimize the weights for better performance during interference
+    * Quantize/Optimize the weights for better performance during inference
     * Convert the trained model into .pb file for running on TF Serving or any other supported platform
 
 In this example, we export YOLOv2 with darknet-19 as feature extractor
@@ -16,7 +16,8 @@ import yaml
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
-from yolov2.zoo import yolov2_darknet19
+
+from model import yolov2
 
 # TF Libraries to export model into .pb file
 from tensorflow.python.client import session
@@ -48,7 +49,7 @@ def _main_():
     export_path = os.path.join(output_dir, str(version))
 
     # ######################
-    #  Interference Pipeline
+    #  inference Pipeline
     # ######################
     with K.get_session() as sess:
         K.set_learning_phase(0)
@@ -58,15 +59,8 @@ def _main_():
         # ###################
         # Define Keras Model
         # ###################
-        model = yolov2_darknet19(is_training = False,
-                                 img_size    = model_cfg['image_size'],
-                                 anchors     = anchors,
-                                 num_classes = model_cfg['num_classes'],
-                                 max_boxes   = deploy_cfg['maximum_boxes'],
-                                 iou         = deploy_cfg['iou_threshold'],
-                                 scores_threshold = deploy_cfg['score_threshold'])
+        model = yolov2(is_training=False, config=config)
 
-        model.load_weights(model_cfg['weight_file'])
         model.summary()
 
         # ########################
@@ -76,7 +70,7 @@ def _main_():
         outputs['detection_boxes']   = tf.identity(model.outputs[0], name='detection_boxes')
         outputs['detection_scores']  = tf.identity(model.outputs[1], name='detection_scores')
         outputs['detection_classes'] = tf.identity(model.outputs[2], name='detection_classes')
-
+        outputs['num_detections']
         for output_key in outputs:
             tf.add_to_collection('inference_op', outputs[output_key])
 
